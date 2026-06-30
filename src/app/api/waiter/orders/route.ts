@@ -4,6 +4,7 @@ import {
   addOrderItems,
   cancelPendingOrder,
   cancelTableTransaction,
+  completeOrderCheckout,
   getTableOrder,
   openTableOrder,
   sendOrderToKitchen,
@@ -42,6 +43,11 @@ export async function POST(request: Request) {
       });
       const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
       return NextResponse.json(await getTableOrder(order.tableId));
+    }
+
+    if (action === "checkout" && orderId) {
+      const result = await completeOrderCheckout(orderId, store.id);
+      return NextResponse.json(result);
     }
 
     if (action === "cancelTransaction" && orderId) {

@@ -94,6 +94,9 @@ async function main() {
   console.log("Applying schema...");
   await run("npx", ["prisma", "db", "push"], env);
 
+  console.log("Seeding demo data...");
+  await run("npx", ["tsx", "scripts/seed-demo.ts"], env);
+
   console.log("Building app...");
   await run("npm", ["run", "build"], env);
 

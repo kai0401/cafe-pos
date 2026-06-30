@@ -1,9 +1,6 @@
 import { EatInType, ProductStatus, TableStatus } from "@prisma/client";
-import {
-  categorySortOrder,
-  resolveCategoryName,
-  WAITER_CATEGORY_ORDER,
-} from "./smaregi-categories";
+import { categorySortOrder, resolveCategoryName, WAITER_CATEGORY_ORDER } from "./smaregi-categories";
+import { ensureDemoData } from "./demo-seed";
 import { getDefaultStore, prisma } from "./prisma";
 
 const TABLES = [
@@ -77,6 +74,8 @@ export async function ensureWaiterSetup() {
     },
     data: { isActive: false },
   });
+
+  await ensureDemoData(store.id);
 
   return store;
 }

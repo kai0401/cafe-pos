@@ -147,6 +147,45 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
     router.push("/waiter/tables");
   }
 
+  async function completeCheckout() {
+    if (!order) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/waiter/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "checkout", orderId: order.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setToast(data.error ?? "会計に失敗しました");
+        return;
+      }
+      setToast(`会計完了（${formatYen(data.totalAmount)}）`);
+      setTimeout(() => router.push("/waiter/tables"), 800);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function printReceipt() {
+    if (!order || !table) return;
+    const lines = order.items
+      .map(
+        (item) =>
+          `<tr><td>${item.productName}${item.quantity > 1 ? ` ×${item.quantity}` : ""}</td><td style="text-align:right">${formatYen(item.unitPrice * item.quantity)}</td></tr>`,
+      )
+      .join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>レシート</title></head><body style="font-family:sans-serif;padding:24px"><h1>喫茶店</h1><p>テーブル: ${table.name}</p><p>注文番号: ${order.id.slice(-8)}</p><table style="width:100%;border-collapse:collapse">${lines}</table><p style="text-align:right;font-size:18px;font-weight:bold;margin-top:16px">合計 ${formatYen(totals.amount)}</p><script>window.print();</script></body></html>`;
+    const win = window.open("", "_blank", "width=360,height=640");
+    if (!win) {
+      setToast("印刷ウィンドウを開けませんでした");
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+  }
+
   function switchTab(next: Tab) {
     if (next === "order") {
       router.push(`/waiter/order/${tableId}/categories`);
@@ -194,10 +233,11 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
               setMemoDraft(order.note ?? "");
               setMemoOpen(true);
             }}
-            onCheckout={() => setToast("会計機能は Phase 3 で実装予定です")}
+            onCheckout={completeCheckout}
             onCancel={() => setShowCancelConfirm(true)}
-            onPrint={() => setToast("印刷は Phase 4 で実装予定です")}
+            onPrint={printReceipt}
             onTable={() => router.push("/waiter/tables")}
+            loading={loading}
           />
         )}
 
@@ -285,6 +325,7 @@ function SummaryTab({
   onCancel,
   onPrint,
   onTable,
+  loading = false,
 }: {
   order: Order;
   now: number;
@@ -295,6 +336,7 @@ function SummaryTab({
   onCancel: () => void;
   onPrint: () => void;
   onTable: () => void;
+  loading?: boolean;
 }) {
   void now;
   const rows = [
@@ -364,7 +406,8 @@ function SummaryTab({
         <button
           type="button"
           onClick={onCheckout}
-          className="flex w-full items-center justify-center gap-2 rounded-lg py-4 text-[17px] font-semibold text-white"
+          disabled={loading}
+          className="flex w-full items-center justify-center gap-2 rounded-lg py-4 text-[17px] font-semibold text-white disabled:opacity-50"
           style={{ backgroundColor: BLUE }}
         >
           ✓ 取引完了

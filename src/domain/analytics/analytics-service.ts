@@ -19,12 +19,49 @@ export type AnalyticsFilter = {
 
 const DOW_LABELS = ["月", "火", "水", "木", "金", "土", "日"];
 
+function resolveDataSources(filter: AnalyticsFilter): DataSource[] {
+  return filter.dataSource ? [filter.dataSource] : [DataSource.SMAREGI, DataSource.OWN_POS];
+}
+
+type DailySummaryRow = Awaited<
+  ReturnType<typeof prisma.salesDailySummary.findMany>
+>[number];
+
+function mergeDailySummaries(rows: DailySummaryRow[]) {
+  const map = new Map<string, DailySummaryRow>();
+
+  for (const row of rows) {
+    const key = row.businessDate.toISOString().slice(0, 10);
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...row });
+      continue;
+    }
+
+    existing.grossSales += row.grossSales;
+    existing.netSales += row.netSales;
+    existing.customerCount += row.customerCount;
+    existing.orderCount += row.orderCount;
+    existing.itemCount += row.itemCount;
+    existing.dineInSales += row.dineInSales;
+    existing.takeoutSales += row.takeoutSales;
+    existing.avgSpend =
+      existing.customerCount > 0 ? Math.round(existing.netSales / existing.customerCount) : 0;
+  }
+
+  return Array.from(map.values()).sort(
+    (a, b) => a.businessDate.getTime() - b.businessDate.getTime(),
+  );
+}
+
 async function resolveFilter(filter: AnalyticsFilter) {
   const store = await getDefaultStore();
-  const summaries = await prisma.salesDailySummary.findMany({
-    where: { storeId: store.id, dataSource: filter.dataSource ?? DataSource.SMAREGI },
-    orderBy: { businessDate: "asc" },
-  });
+  const summaries = mergeDailySummaries(
+    await prisma.salesDailySummary.findMany({
+      where: { storeId: store.id, dataSource: { in: resolveDataSources(filter) } },
+      orderBy: { businessDate: "asc" },
+    }),
+  );
 
   const startDate = filter.startDate
     ? new Date(filter.startDate)
@@ -69,11 +106,11 @@ export async function getAnalyticsSummary(filter: AnalyticsFilter = {}) {
       s.businessDate.getUTCFullYear() === endDate.getUTCFullYear(),
   );
   const lastMonth = summaries.filter((s) => {
-    const d = new Date(s.businessDate);
-    d.setUTCMonth(d.getUTCMonth() - 1);
+    if (businessDaysOnly && isRegularClosedDay(s.businessDate, closedDays)) return false;
+    const prevMonthRef = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() - 1, 1));
     return (
-      s.businessDate.getUTCMonth() === d.getUTCMonth() &&
-      s.businessDate.getUTCFullYear() === d.getUTCFullYear()
+      s.businessDate.getUTCMonth() === prevMonthRef.getUTCMonth() &&
+      s.businessDate.getUTCFullYear() === prevMonthRef.getUTCFullYear()
     );
   });
 
@@ -86,6 +123,7 @@ export async function getAnalyticsSummary(filter: AnalyticsFilter = {}) {
       salesTransaction: {
         storeId: store.id,
         businessDate: { gte: startDate, lte: endDate },
+        dataSource: filter.dataSource ? filter.dataSource : { in: resolveDataSources(filter) },
       },
     },
     _sum: { amount: true },
@@ -167,7 +205,7 @@ export async function getHourlySales(filter: AnalyticsFilter = {}) {
     where: {
       storeId: store.id,
       businessDate: { gte: startDate, lte: endDate },
-      dataSource: filter.dataSource ?? DataSource.SMAREGI,
+      dataSource: filter.dataSource ? filter.dataSource : { in: resolveDataSources(filter) },
     },
   });
 
@@ -240,7 +278,7 @@ export async function getProductSales(filter: AnalyticsFilter = {}, limit = 20) 
       salesTransaction: {
         storeId: store.id,
         businessDate: { gte: startDate, lte: endDate },
-        dataSource: filter.dataSource ?? DataSource.SMAREGI,
+        dataSource: filter.dataSource ? filter.dataSource : { in: resolveDataSources(filter) },
       },
     },
   });

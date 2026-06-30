@@ -1,10 +1,15 @@
 import {
+  DataSource,
   KitchenTicketStatus,
   OrderItemStatus,
   OrderStatus,
+  PaymentMethodType,
   ProductStatus,
   TableStatus,
+  TransactionType,
 } from "@prisma/client";
+import { aggregateSales } from "@/domain/import/import-service";
+import { getBusinessDate } from "@/lib/datetime";
 import { WAITER_CATEGORY_ORDER } from "@/lib/smaregi-categories";
 import { generateOrderNumber } from "@/lib/waiter-setup";
 import { prisma } from "@/lib/prisma";
@@ -363,5 +368,134 @@ export async function updateKitchenTicketStatus(ticketId: string, status: Kitche
     });
   }
 
+  await syncOrderStatusFromItems(ticket.orderItem.orderId);
+
   return ticket;
+}
+
+async function syncOrderStatusFromItems(orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: { where: { status: { not: OrderItemStatus.CANCELLED } } } },
+  });
+  if (!order || order.status === OrderStatus.PAID || order.status === OrderStatus.CANCELLED) return;
+
+  if (order.items.length === 0) return;
+
+  const allServed = order.items.every(
+    (item) => item.status === OrderItemStatus.SERVED || item.status === OrderItemStatus.DONE,
+  );
+  const hasSent = order.items.some((item) => item.status !== OrderItemStatus.PENDING);
+
+  if (allServed && hasSent) {
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.READY },
+    });
+    return;
+  }
+
+  if (hasSent && order.status === OrderStatus.OPEN) {
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.SENT_TO_KITCHEN },
+    });
+  }
+}
+
+export async function completeOrderCheckout(orderId: string, storeId: string) {
+  const order = await prisma.order.findUniqueOrThrow({
+    where: { id: orderId },
+    include: {
+      items: {
+        where: { status: { not: OrderItemStatus.CANCELLED } },
+        include: { product: true },
+      },
+      table: true,
+    },
+  });
+
+  if (order.status === OrderStatus.PAID || order.status === OrderStatus.CANCELLED) {
+    throw new Error("この取引はすでに完了しています");
+  }
+
+  if (order.items.length === 0) {
+    throw new Error("注文がありません");
+  }
+
+  const pending = order.items.filter((item) => item.status === OrderItemStatus.PENDING);
+  if (pending.length > 0) {
+    throw new Error("未送信の注文があります。先に注文を送信してください");
+  }
+
+  const totalAmount = order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const itemIds = order.items.map((item) => item.id);
+
+  await prisma.orderItem.updateMany({
+    where: { id: { in: itemIds } },
+    data: { status: OrderItemStatus.SERVED },
+  });
+
+  await prisma.kitchenTicket.updateMany({
+    where: {
+      orderItemId: { in: itemIds },
+      status: { not: KitchenTicketStatus.SERVED },
+    },
+    data: { status: KitchenTicketStatus.SERVED, doneAt: new Date() },
+  });
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { status: OrderStatus.PAID },
+  });
+
+  await prisma.table.update({
+    where: { id: order.tableId },
+    data: { status: TableStatus.EMPTY },
+  });
+
+  const businessDate = getBusinessDate(new Date());
+  const tx = await prisma.salesTransaction.create({
+    data: {
+      storeId,
+      externalId: `pos-${order.orderNumber}`,
+      dataSource: DataSource.OWN_POS,
+      transactionType: TransactionType.SALE,
+      transactionAt: new Date(),
+      businessDate,
+      subtotalAmount: totalAmount,
+      totalAmount: totalAmount,
+      tax10Amount: totalAmount,
+      consumptionTax10: Math.round((totalAmount * 10) / 110),
+      customerCount: order.customerCount,
+      eatInType: order.eatInType,
+      tableNumber: order.table.number,
+    },
+  });
+
+  for (const item of order.items) {
+    await prisma.salesTransactionItem.create({
+      data: {
+        salesTransactionId: tx.id,
+        productId: item.productId,
+        productName: item.productName,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        subtotalAmount: item.unitPrice * item.quantity,
+        totalAmount: item.unitPrice * item.quantity,
+      },
+    });
+  }
+
+  await prisma.salesTransactionPayment.create({
+    data: {
+      salesTransactionId: tx.id,
+      method: PaymentMethodType.CASH,
+      amount: totalAmount,
+    },
+  });
+
+  await aggregateSales(storeId, DataSource.OWN_POS);
+
+  return { totalAmount, orderNumber: order.orderNumber };
 }
