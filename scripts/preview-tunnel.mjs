@@ -4,13 +4,14 @@ import { readFile, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkPublicUrl } from "./preview-health.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const appPort = Number(process.env.PREVIEW_PORT ?? 3100);
 const logFile = path.join(root, ".preview-logs", "cloudflared.log");
 
 async function waitForTunnel() {
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 90; i++) {
     try {
       const text = await readFile(logFile, "utf8");
       const match = text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
@@ -23,6 +24,18 @@ async function waitForTunnel() {
   return null;
 }
 
+async function writePreview(publicUrl) {
+  const preview = {
+    publicUrl,
+    waiterTables: `${publicUrl}/waiter/tables`,
+    adminDashboard: `${publicUrl}/admin/dashboard`,
+    localUrl: `http://127.0.0.1:${appPort}`,
+    updatedAt: new Date().toISOString(),
+  };
+  await writeFile(path.join(root, "PREVIEW_URL.json"), JSON.stringify(preview, null, 2));
+  return preview;
+}
+
 async function main() {
   const health = await fetch(`http://127.0.0.1:${appPort}/waiter/tables`).catch(() => null);
   if (!health?.ok) {
@@ -32,7 +45,7 @@ async function main() {
   }
 
   spawn("pkill", ["-f", "cloudflared"], { stdio: "ignore" }).on("exit", () => {});
-  await new Promise((r) => setTimeout(r, 1500));
+  await new Promise((r) => setTimeout(r, 2000));
 
   const logFd = openSync(logFile, "w");
   const child = spawn(
@@ -48,15 +61,17 @@ async function main() {
     process.exit(1);
   }
 
-  const preview = {
-    publicUrl,
-    waiterTables: `${publicUrl}/waiter/tables`,
-    adminDashboard: `${publicUrl}/admin/dashboard`,
-    localUrl: `http://127.0.0.1:${appPort}`,
-    updatedAt: new Date().toISOString(),
-  };
+  const preview = await writePreview(publicUrl);
 
-  await writeFile(path.join(root, "PREVIEW_URL.json"), JSON.stringify(preview, null, 2));
+  for (let i = 0; i < 90; i++) {
+    if (checkPublicUrl(publicUrl)) {
+      console.log(preview.waiterTables);
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+
+  console.warn("Tunnel URL created but external check is still pending. Try:");
   console.log(preview.waiterTables);
 }
 
