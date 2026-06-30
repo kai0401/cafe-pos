@@ -145,8 +145,8 @@ export function GuestCountDialog({
 }) {
   const counts = [1, 2, 3, 4, 5, 6, 7, 8];
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/40">
-      <div className="pb-safe w-full max-w-[var(--waiter-width)] rounded-t-2xl bg-white p-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-[320px] rounded-2xl bg-white p-5">
         <h2 className="mb-3 text-center text-[16px] font-bold">人数を選択</h2>
         <div className="grid grid-cols-4 gap-2">
           {counts.map((n) => (
