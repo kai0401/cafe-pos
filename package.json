@@ -12,6 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx scripts/seed-demo.ts",
+    "db:import": "tsx scripts/import-csv.ts",
+    "preview:reset": "node -e \"require('fs').rmSync('.preview-data',{recursive:true,force:true})\"",
     "preview:public": "node scripts/preview-public.mjs",
     "preview:tunnel": "node scripts/preview-tunnel.mjs",
     "postinstall": "prisma generate"

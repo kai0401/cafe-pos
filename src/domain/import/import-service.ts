@@ -57,6 +57,7 @@ export async function importProductMaster(
       const name = getColumn(row, "商品名");
       const price = parseYen(getColumn(row, "商品単価"));
       const cost = parseYen(getColumn(row, "原価")) || null;
+      const sortOrder = i + 1;
 
       const existingMapping = await prisma.externalProductMapping.findUnique({
         where: {
@@ -77,6 +78,7 @@ export async function importProductMaster(
             costAmount: cost,
             categoryId: category.id,
             smaregiDeptId: deptId,
+            sortOrder,
           },
         });
         skipped++;
@@ -93,6 +95,7 @@ export async function importProductMaster(
           taxRate: mapTaxRate(getColumn(row, "税区分")),
           dataSource: DataSource.SMAREGI,
           smaregiDeptId: deptId,
+          sortOrder,
         },
       });
 

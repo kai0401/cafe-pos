@@ -87,8 +87,14 @@ npm run dev
 CLIから一括インポート:
 
 ```bash
+# data/smaregi/ に 商品.csv と 取引.csv を置いた場合
+npm run db:import
+
+# またはパスを直接指定
 npx tsx scripts/import-csv.ts "商品.csv" "取引.csv"
 ```
+
+プレビュー（`npm run preview:public`）も `data/smaregi/` の CSV を自動インポートします。仮のデモメニューは使いません。
 
 ## 突合基準（テストデータ）
 

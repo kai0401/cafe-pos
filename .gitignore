@@ -43,6 +43,8 @@ prisma/*.db-journal
 .preview-data/
 .preview-logs/
 PREVIEW_URL.json
+!data/smaregi/
+!data/smaregi/**
 
 # vercel
 .vercel

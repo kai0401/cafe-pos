@@ -1,21 +1,31 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { existsSync, openSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import EmbeddedPostgres from "embedded-postgres";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.join(root, ".preview-data");
+const smaregiDir = path.join(root, "data", "smaregi");
 const pgPort = 55432;
 const appPort = 3100;
 const logDir = path.join(root, ".preview-logs");
+
+const productCandidates = ["商品.csv", "products.csv", "product.csv"];
+const transactionCandidates = ["取引.csv", "transactions.csv", "transaction.csv"];
 
 const dbUser = "cafe";
 const dbPass = "cafe";
 const dbName = "cafe_pos";
 const databaseUrl = `postgresql://${dbUser}:${dbPass}@127.0.0.1:${pgPort}/${dbName}?schema=public`;
+
+function hasSmaregiCsv() {
+  const hasProduct = productCandidates.some((name) => existsSync(path.join(smaregiDir, name)));
+  const hasTransaction = transactionCandidates.some((name) => existsSync(path.join(smaregiDir, name)));
+  return hasProduct && hasTransaction;
+}
 
 function run(cmd, args, env = {}) {
   return new Promise((resolve, reject) => {
@@ -76,6 +86,10 @@ async function main() {
 
   console.log("Starting embedded PostgreSQL...");
   const pgDir = path.join(dataDir, "postgres");
+  if (hasSmaregiCsv() && process.env.KEEP_PREVIEW_DB !== "1") {
+    console.log("Smaregi CSV detected — resetting preview database for a clean import...");
+    await rm(pgDir, { recursive: true, force: true });
+  }
   const pg = new EmbeddedPostgres({
     databaseDir: pgDir,
     user: dbUser,
@@ -94,7 +108,7 @@ async function main() {
   console.log("Applying schema...");
   await run("npx", ["prisma", "db", "push"], env);
 
-  console.log("Seeding demo data...");
+  console.log("Importing Smaregi menu and sales data...");
   await run("npx", ["tsx", "scripts/seed-demo.ts"], env);
 
   console.log("Building app...");
