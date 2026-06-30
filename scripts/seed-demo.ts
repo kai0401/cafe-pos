@@ -1,23 +1,37 @@
 import { ensureWaiterSetup } from "../src/lib/waiter-setup";
-import { removeDemoMenu } from "../src/lib/demo-seed";
-import { ensureSmaregiData } from "../src/lib/smaregi-seed";
+import { ensureDemoData, removeDemoMenu } from "../src/lib/demo-seed";
+import { ensureSmaregiData, resolveSmaregiCsvPaths } from "../src/lib/smaregi-seed";
 import { prisma } from "../src/lib/prisma";
 
 async function main() {
   const store = await prisma.store.findFirst();
-  if (store) {
-    const removed = await removeDemoMenu(store.id);
-    if (removed > 0) {
-      console.log(`Removed ${removed} placeholder menu items`);
-    }
-  }
+  const csvPaths = resolveSmaregiCsvPaths();
 
-  const { imported, summary } = await ensureSmaregiData();
-  if (!imported) {
-    console.error(
-      "スマレジCSVが見つかりません。data/smaregi/ に 商品.csv と 取引.csv を置いてから再実行してください。",
+  if (csvPaths) {
+    if (store) {
+      const removed = await removeDemoMenu(store.id);
+      if (removed > 0) {
+        console.log(`Removed ${removed} placeholder menu items`);
+      }
+    }
+
+    const { imported, summary } = await ensureSmaregiData();
+    if (!imported) {
+      console.log("Smaregi products already imported — skipped CSV import");
+    } else {
+      console.log(
+        `Imported Smaregi data: products=${summary?.productCount}, transactions=${summary?.transactionCount}, total=¥${(summary?.totalAmount ?? 0).toLocaleString()}`,
+      );
+    }
+  } else {
+    console.warn(
+      "スマレジCSVが見つかりません。プレビュー用のフォールバックデータを使用します。",
     );
-    process.exit(1);
+    console.warn("本番メニュー・売上を使う場合は data/smaregi/ に 商品.csv と 取引.csv を置いて再実行してください。");
+    const targetStore = store ?? (await prisma.store.findFirst());
+    if (targetStore) {
+      await ensureDemoData(targetStore.id);
+    }
   }
 
   await ensureWaiterSetup();
@@ -28,9 +42,7 @@ async function main() {
     prisma.table.count(),
   ]);
 
-  console.log(
-    `Imported Smaregi data: products=${summary?.productCount ?? products}, transactions=${summary?.transactionCount ?? transactions}, total=¥${(summary?.totalAmount ?? 0).toLocaleString()}, tables=${tables}`,
-  );
+  console.log(`Seed complete: products=${products}, transactions=${transactions}, tables=${tables}`);
 }
 
 main()

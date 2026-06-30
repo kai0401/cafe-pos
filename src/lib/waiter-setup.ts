@@ -1,4 +1,4 @@
-import { EatInType, ProductStatus, TableStatus } from "@prisma/client";
+import { EatInType, OrderStatus, TableStatus } from "@prisma/client";
 import { categorySortOrder, resolveCategoryName, WAITER_CATEGORY_ORDER } from "./smaregi-categories";
 import { getDefaultStore, prisma } from "./prisma";
 
@@ -17,9 +17,40 @@ const TABLES = [
   })),
 ];
 
+async function resetStaleOpenOrders(storeId: string) {
+  const emptyOrders = await prisma.order.findMany({
+    where: {
+      storeId,
+      status: { in: [OrderStatus.OPEN, OrderStatus.SENT_TO_KITCHEN, OrderStatus.READY] },
+      items: { none: {} },
+    },
+    select: { id: true, tableId: true },
+  });
+  if (emptyOrders.length === 0) return;
+
+  await prisma.order.deleteMany({ where: { id: { in: emptyOrders.map((o) => o.id) } } });
+
+  const tableIds = [...new Set(emptyOrders.map((o) => o.tableId))];
+  for (const tableId of tableIds) {
+    const active = await prisma.order.count({
+      where: {
+        tableId,
+        status: { in: [OrderStatus.OPEN, OrderStatus.SENT_TO_KITCHEN, OrderStatus.READY] },
+      },
+    });
+    if (active === 0) {
+      await prisma.table.update({
+        where: { id: tableId },
+        data: { status: TableStatus.EMPTY },
+      });
+    }
+  }
+}
+
 export async function ensureWaiterSetup() {
   const store = await getDefaultStore();
 
+  await resetStaleOpenOrders(store.id);
   for (const t of TABLES) {
     await prisma.table.upsert({
       where: { storeId_name: { storeId: store.id, name: t.name } },

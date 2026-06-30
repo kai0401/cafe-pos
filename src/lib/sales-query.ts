@@ -1,6 +1,7 @@
-import { DataSource, TransactionType } from "@prisma/client";
+import { DataSource } from "@prisma/client";
 import { getHourJST } from "@/lib/datetime";
 import { prisma } from "@/lib/prisma";
+import { buildSalesTransactionWhere } from "@/lib/sales-data-mode";
 
 export type DailySalesRow = {
   businessDate: Date;
@@ -14,21 +15,12 @@ export type DailySalesRow = {
   avgSpend: number;
 };
 
-export function nonDemoSalesWhere(storeId: string, dataSources: DataSource[]) {
-  return {
-    storeId,
-    dataSource: { in: dataSources },
-    transactionType: TransactionType.SALE,
-    NOT: { externalId: { startsWith: "demo-" } },
-  } as const;
-}
-
 export async function loadDailySalesFromTransactions(
   storeId: string,
   dataSources: DataSource[],
 ): Promise<DailySalesRow[]> {
   const transactions = await prisma.salesTransaction.findMany({
-    where: nonDemoSalesWhere(storeId, dataSources),
+    where: await buildSalesTransactionWhere(storeId, dataSources),
     select: {
       businessDate: true,
       totalAmount: true,
@@ -86,7 +78,7 @@ export async function loadHourlySalesFromTransactions(
 ) {
   const transactions = await prisma.salesTransaction.findMany({
     where: {
-      ...nonDemoSalesWhere(storeId, dataSources),
+      ...(await buildSalesTransactionWhere(storeId, dataSources)),
       businessDate: { gte: startDate, lte: endDate },
     },
     select: {

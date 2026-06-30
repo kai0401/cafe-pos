@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const { summary, daily, hourly, products, weather } = data;
+  const { summary, daily, hourly, products, weather, isPreviewData } = data;
 
   if (summary.totals.sales === 0) {
     return (
@@ -71,6 +71,16 @@ export default async function DashboardPage() {
           CSVインポート
         </Link>
       </PageHeader>
+
+      {isPreviewData && (
+        <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          プレビュー用のサンプルデータを表示しています。本番のメニュー・売上を反映するには
+          <Link href="/admin/imports" className="mx-1 font-medium underline">
+            スマレジCSVをインポート
+          </Link>
+          してください。
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard

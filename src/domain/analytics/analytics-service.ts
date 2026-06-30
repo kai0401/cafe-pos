@@ -12,9 +12,9 @@ import { getDefaultStore, prisma } from "@/lib/prisma";
 import {
   loadDailySalesFromTransactions,
   loadHourlySalesFromTransactions,
-  nonDemoSalesWhere,
   type DailySalesRow,
 } from "@/lib/sales-query";
+import { buildSalesTransactionWhere, hasImportedSmaregiData } from "@/lib/sales-data-mode";
 import { getClosedDays } from "@/lib/store-config";
 import { STORE_LOCATION } from "@/lib/store-location";
 import { getWeatherForDates } from "@/domain/weather/weather-service";
@@ -98,11 +98,12 @@ export async function getAnalyticsSummary(filter: AnalyticsFilter = {}) {
   const monthSales = thisMonth.reduce((sum, s) => sum + s.netSales, 0);
   const prevYearMonthSales = lastYearSameMonth.reduce((sum, s) => sum + s.netSales, 0);
 
+  const salesWhere = await buildSalesTransactionWhere(store.id, dataSources);
   const payments = await prisma.salesTransactionPayment.groupBy({
     by: ["method"],
     where: {
       salesTransaction: {
-        ...nonDemoSalesWhere(store.id, dataSources),
+        ...salesWhere,
         businessDate: { gte: startDate, lte: endDate },
       },
     },
@@ -191,11 +192,13 @@ export async function getDailySales(filter: AnalyticsFilter = {}) {
 }
 
 export async function getDashboardData(filter: AnalyticsFilter = {}) {
-  const [summary, daily, hourly, products] = await Promise.all([
+  const store = await getDefaultStore();
+  const [summary, daily, hourly, products, isPreviewData] = await Promise.all([
     getAnalyticsSummary(filter),
     getDailySales(filter),
     getHourlySales({ ...filter, businessHoursOnly: true }),
     getProductSales(filter, 10),
+    hasImportedSmaregiData(store.id).then((imported) => !imported),
   ]);
 
   const recent = daily.slice(-21);
@@ -203,7 +206,6 @@ export async function getDashboardData(filter: AnalyticsFilter = {}) {
     ...recent.map((d) => d.date),
     ...recent.map((d) => d.yoyDate),
   ];
-  const store = await getDefaultStore();
   const weather = await getWeatherForDates(store.id, weatherDates);
 
   return {
@@ -212,6 +214,7 @@ export async function getDashboardData(filter: AnalyticsFilter = {}) {
     hourly: hourly.filter((h) => h.sales > 0),
     products,
     weather: Object.fromEntries(weather),
+    isPreviewData,
   };
 }
 
@@ -257,11 +260,12 @@ export async function getWeekdaySales(filter: AnalyticsFilter = {}) {
 
 export async function getProductSales(filter: AnalyticsFilter = {}, limit = 20) {
   const { store, startDate, endDate, dataSources } = await resolveFilter(filter);
+  const salesWhere = await buildSalesTransactionWhere(store.id, dataSources);
 
   const items = await prisma.salesTransactionItem.findMany({
     where: {
       salesTransaction: {
-        ...nonDemoSalesWhere(store.id, dataSources),
+        ...salesWhere,
         businessDate: { gte: startDate, lte: endDate },
       },
     },
@@ -401,10 +405,11 @@ export async function getProfitLossReport(filter: AnalyticsFilter = {}) {
   });
   const prevRevenue = prevDaily.reduce((sum, row) => sum + row.sales, 0);
 
+  const salesWhere = await buildSalesTransactionWhere(store.id, resolveDataSources(filter));
   const prevItems = await prisma.salesTransactionItem.findMany({
     where: {
       salesTransaction: {
-        ...nonDemoSalesWhere(store.id, resolveDataSources(filter)),
+        ...salesWhere,
         businessDate: { gte: prevMonthStart, lte: new Date(Date.UTC(prevMonthStart.getUTCFullYear(), prevMonthStart.getUTCMonth() + 1, 0)) },
       },
     },
@@ -421,7 +426,7 @@ export async function getProfitLossReport(filter: AnalyticsFilter = {}) {
   const items = await prisma.salesTransactionItem.findMany({
     where: {
       salesTransaction: {
-        ...nonDemoSalesWhere(store.id, resolveDataSources(filter)),
+        ...salesWhere,
         businessDate: { gte: monthStart, lte: monthEnd },
       },
     },
