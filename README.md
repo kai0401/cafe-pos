@@ -4,14 +4,16 @@
 
 ## 常時プレビュー（スマホからもアクセス可）
 
-### いま見れるURL（クラウドエージェント起動中）
+### いま見れるURL
 
 | 画面 | URL |
 |------|-----|
-| ウェイター（テーブル一覧） | https://plus-qualified-task-webshots.trycloudflare.com/waiter/tables |
-| 管理ダッシュボード | https://plus-qualified-task-webshots.trycloudflare.com/admin/dashboard |
+| ウェイター（テーブル一覧） | https://spyware-protected-senior-standards.trycloudflare.com/waiter/tables |
+| 管理ダッシュボード | https://spyware-protected-senior-standards.trycloudflare.com/admin/dashboard |
 
 空いているテーブル（T1 など）をタップすると、人数選択ダイアログが表示されます。
+
+> この URL は一時的なものです。開けなくなったら `npm run preview:tunnel` で新しい URL を発行してください。
 
 ### ワンコマンドで公開プレビュー
 
