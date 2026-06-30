@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 喫茶店 POS 管理（MVP-1）
 
-## Getting Started
+スマレジCSVの取り込みと売上分析ダッシュボード。
 
-First, run the development server:
+## 起動方法
 
 ```bash
+cd cafe-pos
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ブラウザで http://localhost:3000/admin/dashboard を開く。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## CSVインポート
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. http://localhost:3000/admin/imports を開く
+2. スマレジから出力したCSVをアップロード
+3. **プレビュー** → 件数・合計金額を確認 → **インポート実行**
 
-## Learn More
+対応形式:
+- 商品マスターCSV（Shift_JIS / UTF-8 自動判別）
+- 取引明細CSV（スマレジ「取引履歴」）
 
-To learn more about Next.js, take a look at the following resources:
+CLIから一括インポート:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npx tsx scripts/import-csv.ts "商品.csv" "取引.csv"
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 突合基準（テストデータ）
 
-## Deploy on Vercel
+| 項目 | 期待値 |
+|------|--------|
+| 取引数 | 6,200件 |
+| 合計売上 | ¥11,193,950 |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 画面一覧
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| URL | 内容 |
+|-----|------|
+| `/admin/dashboard` | 売上ダッシュボード |
+| `/admin/analytics/daily` | 日別売上（全日表示） |
+| `/admin/analytics/hourly` | 時間帯・曜日別 |
+| `/admin/analytics/products` | 商品別売上 |
+| `/admin/reports/monthly` | 月次レポート |
+| `/admin/imports` | CSVインポート |
+| `/admin/products` | 商品一覧 |
+
+## 営業設定
+
+- 営業時間: 11:00–18:00
+- 定休日: 木曜
+- ダッシュボードは「営業日のみ」がデフォルト
+- 日別・時間帯画面は「全日・全時間帯」も表示
+
+## DB
+
+開発環境は SQLite（`prisma/dev.db`）。本番は PostgreSQL に切替可能（`docker-compose.yml` 参照）。
+
+```bash
+# PostgreSQL（Docker がある場合）
+npm run db:up
+# .env の DATABASE_URL を postgresql://... に変更
+npm run db:push
+```
+
+## 技術スタック
+
+Next.js 16 / React 19 / TypeScript / Prisma 6 / SQLite / Recharts / Papaparse

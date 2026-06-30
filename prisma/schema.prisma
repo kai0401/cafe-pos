@@ -1,0 +1,505 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum DataSource {
+  SMAREGI
+  OWN_POS
+}
+
+enum TransactionType {
+  SALE
+  REFUND
+  VOID
+  CANCEL
+}
+
+enum TaxRate {
+  STANDARD_10
+  REDUCED_8
+  EXEMPT
+}
+
+enum EatInType {
+  DINE_IN
+  TAKEOUT
+}
+
+enum ProductStatus {
+  ACTIVE
+  SOLD_OUT
+  HIDDEN
+}
+
+enum ImportSourceType {
+  CSV
+  API
+}
+
+enum ImportJobStatus {
+  PENDING
+  PARSING
+  PREVIEW
+  IMPORTING
+  NORMALIZING
+  AGGREGATING
+  COMPLETED
+  FAILED
+}
+
+enum ImportFileType {
+  PRODUCT_MASTER
+  TRANSACTION_DETAIL
+  TRANSACTION_PAYMENT
+  DAILY_CLOSING
+}
+
+enum PaymentMethodType {
+  CASH
+  CREDIT_CARD
+  TRANSIT_IC
+  QR
+  OTHER
+}
+
+enum RoleType {
+  ADMIN
+  HALL
+  KITCHEN
+  CASHIER
+}
+
+enum TableStatus {
+  EMPTY
+  OCCUPIED
+  AWAITING_PAYMENT
+}
+
+enum OrderStatus {
+  OPEN
+  SENT_TO_KITCHEN
+  READY
+  PAID
+  CANCELLED
+}
+
+enum OrderItemStatus {
+  PENDING
+  SENT
+  COOKING
+  DONE
+  SERVED
+  CANCELLED
+}
+
+enum KitchenTicketStatus {
+  NEW
+  COOKING
+  DONE
+  SERVED
+}
+
+model Store {
+  id               String   @id @default(cuid())
+  name             String
+  invoiceRegNumber String?  @map("invoice_reg_number")
+  openTime         String   @default("11:00") @map("open_time")
+  closeTime        String   @default("18:00") @map("close_time")
+  regularClosedDays Json     @default("[3]") @map("regular_closed_days")
+  timezone         String   @default("Asia/Tokyo")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  categories       ProductCategory[]
+  products         Product[]
+  tables           Table[]
+  orders           Order[]
+  importJobs       SmaregiImportJob[]
+  salesTransactions SalesTransaction[]
+  dailySummaries   SalesDailySummary[]
+  hourlySummaries  SalesHourlySummary[]
+  productSummaries SalesProductSummary[]
+  paymentSummaries SalesPaymentSummary[]
+  taxSummaries     SalesTaxSummary[]
+
+  @@map("stores")
+}
+
+model Role {
+  id   String   @id @default(cuid())
+  type RoleType @unique
+  name String
+
+  @@map("roles")
+}
+
+model ProductCategory {
+  id        String   @id @default(cuid())
+  storeId   String   @map("store_id")
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  store    Store     @relation(fields: [storeId], references: [id])
+  products Product[]
+
+  @@unique([storeId, name])
+  @@map("product_categories")
+}
+
+model Product {
+  id            String        @id @default(cuid())
+  storeId       String        @map("store_id")
+  categoryId    String?       @map("category_id")
+  name          String
+  priceDineIn   Int           @map("price_dine_in")
+  priceTakeout  Int?          @map("price_takeout")
+  taxRate       TaxRate       @default(STANDARD_10) @map("tax_rate")
+  status        ProductStatus @default(ACTIVE)
+  sendToKitchen Boolean       @default(true) @map("send_to_kitchen")
+  smaregiDeptId String?       @map("smaregi_dept_id")
+  smaregiDeptName String?     @map("smaregi_dept_name")
+  costAmount    Int?          @map("cost_amount")
+  sortOrder     Int           @default(0) @map("sort_order")
+  dataSource    DataSource    @default(SMAREGI) @map("data_source")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  store           Store                    @relation(fields: [storeId], references: [id])
+  category        ProductCategory?         @relation(fields: [categoryId], references: [id])
+  externalMapping ExternalProductMapping[]
+  salesItems      SalesTransactionItem[]
+  orderItems      OrderItem[]
+
+  @@map("products")
+}
+
+model Table {
+  id        String      @id @default(cuid())
+  storeId   String      @map("store_id")
+  number    Int
+  name      String
+  eatInType EatInType   @default(DINE_IN) @map("eat_in_type")
+  status    TableStatus @default(EMPTY)
+  sortOrder Int         @default(0) @map("sort_order")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  store  Store   @relation(fields: [storeId], references: [id])
+  orders Order[]
+
+  @@unique([storeId, name])
+  @@map("tables")
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  storeId       String      @map("store_id")
+  tableId       String      @map("table_id")
+  orderNumber   String      @map("order_number")
+  status        OrderStatus @default(OPEN)
+  eatInType     EatInType   @default(DINE_IN) @map("eat_in_type")
+  customerCount Int         @default(1) @map("customer_count")
+  note          String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  store Store       @relation(fields: [storeId], references: [id])
+  table Table       @relation(fields: [tableId], references: [id])
+  items OrderItem[]
+
+  @@unique([storeId, orderNumber])
+  @@index([tableId, status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String          @id @default(cuid())
+  orderId     String          @map("order_id")
+  productId   String          @map("product_id")
+  productName String          @map("product_name")
+  unitPrice   Int             @map("unit_price")
+  quantity    Int             @default(1)
+  status      OrderItemStatus @default(PENDING)
+  note        String?
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  order         Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product        @relation(fields: [productId], references: [id])
+  kitchenTicket KitchenTicket?
+
+  @@map("order_items")
+}
+
+model KitchenTicket {
+  id          String              @id @default(cuid())
+  orderItemId String              @unique @map("order_item_id")
+  status      KitchenTicketStatus @default(NEW)
+  queuedAt    DateTime            @default(now()) @map("queued_at")
+  doneAt      DateTime?           @map("done_at")
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([status, queuedAt])
+  @@map("kitchen_tickets")
+}
+
+model ExternalProductMapping {
+  id                  String     @id @default(cuid())
+  productId           String     @map("product_id")
+  externalSource      DataSource @default(SMAREGI) @map("external_source")
+  externalProductId   String     @map("external_product_id")
+  externalProductCode String?    @map("external_product_code")
+  externalProductName String?    @map("external_product_name")
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([externalSource, externalProductId])
+  @@map("external_product_mappings")
+}
+
+model ExternalPaymentMapping {
+  id                  String            @id @default(cuid())
+  paymentMethodType   PaymentMethodType @map("payment_method_type")
+  externalSource      DataSource        @default(SMAREGI) @map("external_source")
+  externalPaymentId   String            @map("external_payment_id")
+  externalPaymentName String            @map("external_payment_name")
+
+  @@unique([externalSource, externalPaymentId])
+  @@map("external_payment_mappings")
+}
+
+model SmaregiImportJob {
+  id             String           @id @default(cuid())
+  storeId        String           @map("store_id")
+  sourceType     ImportSourceType @map("source_type")
+  fileType       ImportFileType   @map("file_type")
+  fileName       String?          @map("file_name")
+  fileHash       String?          @map("file_hash")
+  encoding       String?
+  status         ImportJobStatus  @default(PENDING)
+  totalRows      Int              @default(0) @map("total_rows")
+  successRows    Int              @default(0) @map("success_rows")
+  failedRows     Int              @default(0) @map("failed_rows")
+  skippedRows    Int              @default(0) @map("skipped_rows")
+  previewSummary Json?            @map("preview_summary")
+  resultSummary  Json?            @map("result_summary")
+  startedAt      DateTime?        @map("started_at")
+  completedAt    DateTime?        @map("completed_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  store             Store                         @relation(fields: [storeId], references: [id])
+  errors            SmaregiImportError[]
+  rawDetails        SmaregiRawTransactionDetail[]
+  salesTransactions SalesTransaction[]
+
+  @@index([storeId, createdAt])
+  @@map("smaregi_import_jobs")
+}
+
+model SmaregiImportError {
+  id           String @id @default(cuid())
+  importJobId  String @map("import_job_id")
+  rowNumber    Int    @map("row_number")
+  rawPayload   Json   @map("raw_payload")
+  errorCode    String @map("error_code")
+  errorMessage String @map("error_message")
+
+  importJob SmaregiImportJob @relation(fields: [importJobId], references: [id])
+
+  @@map("smaregi_import_errors")
+}
+
+model SmaregiRawTransactionDetail {
+  id                   String   @id @default(cuid())
+  importJobId          String   @map("import_job_id")
+  smaregiTransactionId String   @map("smaregi_transaction_id")
+  smaregiDetailId      String   @map("smaregi_detail_id")
+  rawPayload           Json     @map("raw_payload")
+  sourceRowNumber      Int      @map("source_row_number")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  importJob SmaregiImportJob @relation(fields: [importJobId], references: [id])
+
+  @@unique([smaregiTransactionId, smaregiDetailId])
+  @@index([smaregiTransactionId])
+  @@map("smaregi_raw_transaction_details")
+}
+
+model SalesTransaction {
+  id               String          @id @default(cuid())
+  storeId          String          @map("store_id")
+  externalId       String          @map("external_id")
+  dataSource       DataSource      @map("data_source")
+  transactionType  TransactionType @map("transaction_type")
+  transactionAt    DateTime        @map("transaction_at")
+  businessDate     DateTime        @map("business_date")
+  subtotalAmount   Int             @map("subtotal_amount")
+  discountAmount   Int             @default(0) @map("discount_amount")
+  totalAmount      Int             @map("total_amount")
+  tax10Amount      Int             @default(0) @map("tax_10_amount")
+  tax8Amount       Int             @default(0) @map("tax_8_amount")
+  taxExemptAmount  Int             @default(0) @map("tax_exempt_amount")
+  consumptionTax10 Int             @default(0) @map("consumption_tax_10")
+  consumptionTax8  Int             @default(0) @map("consumption_tax_8")
+  consumptionTax   Int             @default(0) @map("consumption_tax")
+  customerCount    Int             @default(1) @map("customer_count")
+  eatInType        EatInType       @default(DINE_IN) @map("eat_in_type")
+  staffName        String?         @map("staff_name")
+  tableNumber      Int?            @map("table_number")
+  tableName        String?         @map("table_name")
+  entryTime        DateTime?       @map("entry_time")
+  importJobId      String?         @map("import_job_id")
+  createdAt        DateTime        @default(now()) @map("created_at")
+
+  store     Store              @relation(fields: [storeId], references: [id])
+  importJob SmaregiImportJob?  @relation(fields: [importJobId], references: [id])
+  items     SalesTransactionItem[]
+  payments  SalesTransactionPayment[]
+
+  @@unique([dataSource, externalId])
+  @@index([storeId, businessDate])
+  @@index([transactionAt])
+  @@map("sales_transactions")
+}
+
+model SalesTransactionItem {
+  id                 String  @id @default(cuid())
+  salesTransactionId String  @map("sales_transaction_id")
+  externalDetailId   String? @map("external_detail_id")
+  productId          String? @map("product_id")
+  externalProductId  String? @map("external_product_id")
+  productName        String  @map("product_name")
+  categoryId         String? @map("category_id")
+  categoryName       String? @map("category_name")
+  quantity           Int
+  unitPrice          Int     @map("unit_price")
+  subtotalAmount     Int     @map("subtotal_amount")
+  discountAmount     Int     @default(0) @map("discount_amount")
+  totalAmount        Int     @map("total_amount")
+  taxRate            TaxRate @default(STANDARD_10) @map("tax_rate")
+  costAmount         Int?    @map("cost_amount")
+
+  salesTransaction SalesTransaction @relation(fields: [salesTransactionId], references: [id], onDelete: Cascade)
+  product          Product?           @relation(fields: [productId], references: [id])
+
+  @@unique([salesTransactionId, externalDetailId])
+  @@map("sales_transaction_items")
+}
+
+model SalesTransactionPayment {
+  id                 String            @id @default(cuid())
+  salesTransactionId String            @map("sales_transaction_id")
+  method             PaymentMethodType
+  amount             Int
+
+  salesTransaction SalesTransaction @relation(fields: [salesTransactionId], references: [id], onDelete: Cascade)
+
+  @@map("sales_transaction_payments")
+}
+
+model SalesDailySummary {
+  id             String     @id @default(cuid())
+  storeId        String     @map("store_id")
+  businessDate   DateTime   @map("business_date")
+  dataSource     DataSource @map("data_source")
+  grossSales     Int        @map("gross_sales")
+  discountAmount Int        @default(0) @map("discount_amount")
+  netSales       Int        @map("net_sales")
+  customerCount  Int        @default(0) @map("customer_count")
+  orderCount     Int        @default(0) @map("order_count")
+  itemCount      Int        @default(0) @map("item_count")
+  avgSpend       Int        @default(0) @map("avg_spend")
+  dineInSales    Int        @default(0) @map("dine_in_sales")
+  takeoutSales   Int        @default(0) @map("takeout_sales")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@unique([storeId, businessDate, dataSource])
+  @@map("sales_daily_summaries")
+}
+
+model SalesHourlySummary {
+  id            String     @id @default(cuid())
+  storeId       String     @map("store_id")
+  businessDate  DateTime   @map("business_date")
+  hour          Int
+  dataSource    DataSource @map("data_source")
+  netSales      Int        @map("net_sales")
+  customerCount Int        @default(0) @map("customer_count")
+  orderCount    Int        @default(0) @map("order_count")
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@unique([storeId, businessDate, hour, dataSource])
+  @@map("sales_hourly_summaries")
+}
+
+model SalesProductSummary {
+  id             String     @id @default(cuid())
+  storeId        String     @map("store_id")
+  productId      String?    @map("product_id")
+  productName    String     @map("product_name")
+  categoryName   String?    @map("category_name")
+  periodStart    DateTime   @map("period_start")
+  periodEnd      DateTime   @map("period_end")
+  dataSource     DataSource @map("data_source")
+  quantity       Int
+  grossSales     Int        @map("gross_sales")
+  discountAmount Int        @default(0) @map("discount_amount")
+  netSales       Int        @map("net_sales")
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@index([storeId, periodStart, periodEnd])
+  @@map("sales_product_summaries")
+}
+
+model SalesPaymentSummary {
+  id           String            @id @default(cuid())
+  storeId      String            @map("store_id")
+  businessDate DateTime          @map("business_date")
+  method       PaymentMethodType
+  dataSource   DataSource        @map("data_source")
+  amount       Int
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@unique([storeId, businessDate, method, dataSource])
+  @@map("sales_payment_summaries")
+}
+
+model SalesTaxSummary {
+  id             String     @id @default(cuid())
+  storeId        String     @map("store_id")
+  businessDate   DateTime   @map("business_date")
+  taxRate        TaxRate    @map("tax_rate")
+  dataSource     DataSource @map("data_source")
+  taxableAmount  Int        @map("taxable_amount")
+  consumptionTax Int        @map("consumption_tax")
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@unique([storeId, businessDate, taxRate, dataSource])
+  @@map("sales_tax_summaries")
+}
+
+model ReportSnapshot {
+  id          String   @id @default(cuid())
+  storeId     String   @map("store_id")
+  reportType  String   @map("report_type")
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+  payload     Json
+  generatedAt DateTime @default(now()) @map("generated_at")
+
+  @@index([storeId, reportType, periodStart])
+  @@map("report_snapshots")
+}

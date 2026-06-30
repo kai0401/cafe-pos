@@ -1,0 +1,10 @@
+{
+  "name": "ウェイター",
+  "short_name": "Waiter",
+  "start_url": "/waiter",
+  "display": "standalone",
+  "background_color": "#e8912d",
+  "theme_color": "#e8912d",
+  "lang": "ja",
+  "icons": [{ "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
