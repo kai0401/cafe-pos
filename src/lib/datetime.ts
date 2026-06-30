@@ -65,3 +65,14 @@ export function countBusinessDays(
   }
   return count;
 }
+
+/** 前年の同じ曜日（52週前） */
+export function getYoYSameWeekdayDate(date: Date): Date {
+  const d = new Date(date);
+  d.setUTCDate(d.getUTCDate() - 364);
+  return d;
+}
+
+export function dateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
