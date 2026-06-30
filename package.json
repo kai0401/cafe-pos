@@ -11,6 +11,7 @@
     "db:up": "docker compose up -d",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
+    "preview:public": "node scripts/preview-public.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -33,6 +34,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "embedded-postgres": "18.4.0-beta.17",
     "prisma": "6.19.3",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",

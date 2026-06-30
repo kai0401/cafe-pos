@@ -4,9 +4,27 @@
 
 ## 常時プレビュー（スマホからもアクセス可）
 
-以下のいずれかでデプロイすると、固定URLでいつでも閲覧できます。
+### いま見れるURL（クラウドエージェント起動中）
 
-### 方法A: Vercel（推奨）
+| 画面 | URL |
+|------|-----|
+| ウェイター（テーブル一覧） | https://plus-qualified-task-webshots.trycloudflare.com/waiter/tables |
+| 管理ダッシュボード | https://plus-qualified-task-webshots.trycloudflare.com/admin/dashboard |
+
+空いているテーブル（T1 など）をタップすると、人数選択ダイアログが表示されます。
+
+### ワンコマンドで公開プレビュー
+
+Vercel アカウント不要。DB 込みで本番ビルドを起動し、スマホから開ける公開 URL を自動発行します。
+
+```bash
+npm install
+npm run preview:public
+```
+
+完了すると `PREVIEW_URL.json` に URL が書き出されます。
+
+### 方法A: Vercel（固定URL・本番向け）
 
 1. [Neon](https://neon.tech) で無料の PostgreSQL プロジェクトを作成し、接続文字列をコピー
 2. 下のボタンから Vercel にデプロイ（`DATABASE_URL` に Neon の接続文字列を入力）
@@ -22,10 +40,12 @@
 
 `main` への push で自動デプロイする場合は、GitHub リポジトリの Secrets に `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` を登録してください。
 
-### 方法B: Render
+### 方法B: Render（固定URL・本番向け）
 
-1. [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**
-2. このリポジトリを選択（`render.yaml` が PostgreSQL と Web サービスを自動作成）
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/kai0401/cafe-pos)
+
+1. 上のボタンから Render にデプロイ（`render.yaml` が PostgreSQL と Web サービスを自動作成）
+2. デプロイ完了後 `https://<service-name>.onrender.com/waiter/tables` でアクセス
 
 ## 起動方法（ローカル開発）
 

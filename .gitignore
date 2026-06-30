@@ -40,6 +40,9 @@ yarn-error.log*
 # local database
 prisma/*.db
 prisma/*.db-journal
+.preview-data/
+.preview-logs/
+PREVIEW_URL.json
 
 # vercel
 .vercel
