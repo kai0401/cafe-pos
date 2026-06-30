@@ -2,15 +2,44 @@
 
 スマレジCSVの取り込みと売上分析ダッシュボード。
 
-## 起動方法
+## 常時プレビュー（スマホからもアクセス可）
+
+以下のいずれかでデプロイすると、固定URLでいつでも閲覧できます。
+
+### 方法A: Vercel（推奨）
+
+1. [Neon](https://neon.tech) で無料の PostgreSQL プロジェクトを作成し、接続文字列をコピー
+2. 下のボタンから Vercel にデプロイ（`DATABASE_URL` に Neon の接続文字列を入力）
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fkai0401%2Fcafe-pos&project-name=cafe-pos&env=DATABASE_URL&envDescription=Neon%20PostgreSQL%20%E6%8E%A5%E7%B6%9A%E6%96%87%E5%AD%97%E5%88%97&envLink=https%3A%2F%2Fneon.tech&demo-title=cafe-pos&demo-description=%E5%96%B6%E6%A5%AD%E7%94%A8%20POS%20MVP)
+
+デプロイ後のURL例:
+
+| 画面 | URL |
+|------|-----|
+| ウェイター（テーブル一覧） | `https://<your-app>.vercel.app/waiter/tables` |
+| 管理ダッシュボード | `https://<your-app>.vercel.app/admin/dashboard` |
+
+`main` への push で自動デプロイする場合は、GitHub リポジトリの Secrets に `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` を登録してください。
+
+### 方法B: Render
+
+1. [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**
+2. このリポジトリを選択（`render.yaml` が PostgreSQL と Web サービスを自動作成）
+
+## 起動方法（ローカル開発）
 
 ```bash
-cd cafe-pos
 npm install
+cp .env.example .env
+# .env の DATABASE_URL を設定（Neon または docker-compose の PostgreSQL）
+npm run db:push
 npm run dev
 ```
 
 ブラウザで http://localhost:3000/admin/dashboard を開く。
+
+スマホからローカル開発サーバーを見る場合は `localhost` ではなく、PC の LAN IP を使います（例: `http://192.168.1.10:3000/waiter/tables`）。PC とスマホは同じ Wi‑Fi に接続してください。
 
 ## CSVインポート
 
@@ -46,6 +75,9 @@ npx tsx scripts/import-csv.ts "商品.csv" "取引.csv"
 | `/admin/reports/monthly` | 月次レポート |
 | `/admin/imports` | CSVインポート |
 | `/admin/products` | 商品一覧 |
+| `/waiter` | ウェイターTOP |
+| `/waiter/tables` | テーブル一覧（人数選択） |
+| `/kitchen` | キッチン画面 |
 
 ## 営業設定
 
@@ -56,15 +88,22 @@ npx tsx scripts/import-csv.ts "商品.csv" "取引.csv"
 
 ## DB
 
-開発環境は SQLite（`prisma/dev.db`）。本番は PostgreSQL に切替可能（`docker-compose.yml` 参照）。
+本番・開発ともに PostgreSQL を使用します（Vercel / Render では SQLite は使えません）。
+
+**Neon（推奨・Docker 不要）**
+
+1. [neon.tech](https://neon.tech) でプロジェクト作成
+2. 接続文字列を `.env` の `DATABASE_URL` に設定
+3. `npm run db:push`
+
+**ローカル PostgreSQL（Docker がある場合）**
 
 ```bash
-# PostgreSQL（Docker がある場合）
 npm run db:up
-# .env の DATABASE_URL を postgresql://... に変更
+# .env の DATABASE_URL を postgresql://cafe:cafe@localhost:5432/cafe_pos?schema=public に設定
 npm run db:push
 ```
 
 ## 技術スタック
 
-Next.js 16 / React 19 / TypeScript / Prisma 6 / SQLite / Recharts / Papaparse
+Next.js 16 / React 19 / TypeScript / Prisma 6 / PostgreSQL / Recharts / Papaparse
