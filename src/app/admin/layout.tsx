@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 const NAV = [
   { href: "/admin/dashboard", label: "ダッシュボード" },
   { href: "/admin/analytics/daily", label: "日別売上" },

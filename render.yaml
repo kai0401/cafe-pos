@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: cafe-pos
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run vercel-build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cafe-pos-db
+          property: connectionString
+
+databases:
+  - name: cafe-pos-db
+    plan: free
+    databaseName: cafe_pos
+    user: cafe
