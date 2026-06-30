@@ -8,6 +8,7 @@ const NAV = [
   { href: "/admin/analytics/hourly", label: "時間帯別" },
   { href: "/admin/analytics/products", label: "商品別売上" },
   { href: "/admin/reports/monthly", label: "月次レポート" },
+  { href: "/admin/reports/profit-loss", label: "損益リポート" },
   { href: "/admin/imports", label: "CSVインポート" },
   { href: "/admin/products", label: "商品管理" },
   { href: "/waiter", label: "ウェイター" },

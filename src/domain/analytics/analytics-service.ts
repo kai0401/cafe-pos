@@ -379,3 +379,135 @@ export async function getSalesTrend(filter: AnalyticsFilter = {}) {
     return { ...d, cumulative };
   });
 }
+
+export type ProfitLossGrade = "S" | "A" | "B" | "C" | "D";
+
+function gradeFromMargin(marginPercent: number): ProfitLossGrade {
+  if (marginPercent >= 70) return "S";
+  if (marginPercent >= 60) return "A";
+  if (marginPercent >= 50) return "B";
+  if (marginPercent >= 40) return "C";
+  return "D";
+}
+
+export async function getProfitLossReport(filter: AnalyticsFilter = {}) {
+  const { store, endDate } = await resolveFilter(filter);
+  const monthStart = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), 1));
+  const monthEnd = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, 0));
+
+  const monthFilter: AnalyticsFilter = {
+    ...filter,
+    startDate: monthStart.toISOString().slice(0, 10),
+    endDate: monthEnd.toISOString().slice(0, 10),
+  };
+
+  const daily = await getDailySales(monthFilter);
+  const revenue = daily.reduce((sum, row) => sum + row.sales, 0);
+  const customers = daily.reduce((sum, row) => sum + row.customers, 0);
+  const businessDays = daily.length;
+
+  const prevMonthStart = new Date(monthStart);
+  prevMonthStart.setUTCMonth(prevMonthStart.getUTCMonth() - 1);
+  const prevDaily = await getDailySales({
+    ...filter,
+    startDate: prevMonthStart.toISOString().slice(0, 10),
+    endDate: new Date(Date.UTC(prevMonthStart.getUTCFullYear(), prevMonthStart.getUTCMonth() + 1, 0))
+      .toISOString()
+      .slice(0, 10),
+  });
+  const prevRevenue = prevDaily.reduce((sum, row) => sum + row.sales, 0);
+
+  const prevItems = await prisma.salesTransactionItem.findMany({
+    where: {
+      salesTransaction: {
+        storeId: store.id,
+        businessDate: { gte: prevMonthStart, lte: new Date(Date.UTC(prevMonthStart.getUTCFullYear(), prevMonthStart.getUTCMonth() + 1, 0)) },
+        dataSource: filter.dataSource ? filter.dataSource : { in: resolveDataSources(filter) },
+      },
+    },
+    include: { product: { select: { costAmount: true } } },
+  });
+
+  let prevCostOfGoods = 0;
+  for (const item of prevItems) {
+    const unitCost = item.costAmount ?? item.product?.costAmount ?? 0;
+    prevCostOfGoods += unitCost * item.quantity;
+  }
+  const prevGrossProfit = prevRevenue - prevCostOfGoods;
+
+  const items = await prisma.salesTransactionItem.findMany({
+    where: {
+      salesTransaction: {
+        storeId: store.id,
+        businessDate: { gte: monthStart, lte: monthEnd },
+        dataSource: filter.dataSource ? filter.dataSource : { in: resolveDataSources(filter) },
+      },
+    },
+    include: { product: { select: { costAmount: true } } },
+  });
+
+  let costOfGoods = 0;
+  let itemsWithCost = 0;
+  const categoryMap = new Map<
+    string,
+    { name: string; revenue: number; cost: number; quantity: number }
+  >();
+
+  for (const item of items) {
+    const unitCost = item.costAmount ?? item.product?.costAmount ?? 0;
+    const lineCost = unitCost * item.quantity;
+    costOfGoods += lineCost;
+    if (unitCost > 0) itemsWithCost += 1;
+
+    const category = item.categoryName ?? "その他";
+    if (!categoryMap.has(category)) {
+      categoryMap.set(category, { name: category, revenue: 0, cost: 0, quantity: 0 });
+    }
+    const row = categoryMap.get(category)!;
+    row.revenue += item.totalAmount;
+    row.cost += lineCost;
+    row.quantity += item.quantity;
+  }
+
+  const grossProfit = revenue - costOfGoods;
+  const marginPercent = revenue > 0 ? Math.round((grossProfit / revenue) * 1000) / 10 : 0;
+  const grade = gradeFromMargin(marginPercent);
+
+  const categories = Array.from(categoryMap.values())
+    .map((row) => ({
+      ...row,
+      profit: row.revenue - row.cost,
+      marginPercent: row.revenue > 0 ? Math.round(((row.revenue - row.cost) / row.revenue) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.profit - a.profit);
+
+  const targetRevenue = prevRevenue > 0 ? Math.round(prevRevenue * 1.05) : revenue;
+  const targetProgress = targetRevenue > 0 ? Math.min(100, Math.round((revenue / targetRevenue) * 1000) / 10) : 0;
+
+  return {
+    store: store.name,
+    period: formatJST(monthStart, "yyyy年M月"),
+    revenue,
+    costOfGoods,
+    grossProfit,
+    marginPercent,
+    grade,
+    prevRevenue,
+    revenueChange: calcPercentChange(revenue, prevRevenue),
+    profitChange: calcPercentChange(grossProfit, prevGrossProfit),
+    businessDays,
+    customers,
+    avgDailyRevenue: businessDays > 0 ? Math.round(revenue / businessDays) : 0,
+    avgSpend: customers > 0 ? Math.round(revenue / customers) : 0,
+    costCoverage: items.length > 0 ? Math.round((itemsWithCost / items.length) * 1000) / 10 : 0,
+    targetRevenue,
+    targetProgress,
+    categories,
+    daily: daily.map((row) => ({
+      date: row.date,
+      dayOfWeek: row.dayOfWeek,
+      revenue: row.sales,
+      customers: row.customers,
+    })),
+  };
+}

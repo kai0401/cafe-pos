@@ -52,3 +52,12 @@ body {
 .waiter-shell .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+@media print {
+  .profit-loss-game {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
