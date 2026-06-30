@@ -16,8 +16,8 @@
 | Phase | 内容 | 状態 |
 |-------|------|------|
 | 1 | スマレジCSV取込 + 売上分析 | ✅ 完了 |
-| 2 | ウェイター + キッチン | 🔄 部分実装 |
-| 3 | 会計 | 未着手 |
+| 2 | ウェイター + キッチン | 🔄 部分実装（プレビュー要 CSV） |
+| 3 | 会計（取引完了・レシート） | 🔄 基本実装済（支払い方法選択は未） |
 | 4 | QRオーダー・プリンター等 | 未着手 |
 
 ## 店舗条件
@@ -28,7 +28,7 @@
 
 ## 技術スタック
 
-Next.js 16 / React 19 / TypeScript / Prisma **6.19.3** / SQLite（開発）/ Recharts / Papaparse / iconv-lite
+Next.js 16 / React 19 / TypeScript / Prisma **6.19.3** / PostgreSQL（本番・プレビュー）/ SQLite（Mac ローカル `dev.db`）/ Recharts / Papaparse / iconv-lite
 
 ## 起動（クラウド / ローカル共通）
 
@@ -61,6 +61,15 @@ npm run dev
 
 - 6,200取引 / ¥11,193,950 / 11,504明細（CSV突合OK）
 - CSV期間: 2025/07〜2026/06（2025/04〜06はなし）
+- **Git に CSV は含めない**（機密・容量のため）。クラウドでは `data/smaregi/商品.csv` と `取引.csv` を配置するか `/admin/imports` から再インポート
+
+## Cloud Agent での作業（2026-06）
+
+- `npm run preview:public` … DB 込み本番ビルド + cloudflared 公開 URL
+- `npm run preview:tunnel` … トンネル URL だけ再発行
+- PR #4 … 仮デモメニュー（17品）を廃止し、スマレジ CSV インポートに切替（**要 CSV 配置**）
+- Phase 3 基本: `completeOrderCheckout`、取引完了ボタン、簡易レシート印刷（`window.print`）
+- 人数選択ダイアログを画面中央モーダルに変更（PR #1 マージ済）
 
 ## 完了した主な実装
 
@@ -78,8 +87,8 @@ npm run dev
 
 ## スマレジとの差分（未実装）
 
-- **取引完了**（会計）→ Phase 3
-- **印刷** → Phase 4
+- **支払い方法の選択**（会計時に現金/カード/QR 等）→ Phase 3 残
+- **本番プリンター連携** → Phase 4（現状はブラウザ印刷のみ）
 - スタッフ選択・客層選択（表示のみ）
 - WebSocket（キッチンは3秒ポーリング）
 
@@ -99,9 +108,10 @@ npm run dev
 
 ## 次の優先タスク
 
-1. Phase 3 会計（取引完了・支払い・レシート）
-2. ウェイター UI のスマレジ完全準拠の細部調整
-3. PostgreSQL 本番化（docker-compose.yml あり）
+1. **スマレジ CSV をクラウドに配置** → `data/smaregi/` に置いて `npm run preview:reset && npm run preview:public`（メニュー不一致の解消）
+2. Phase 3 残: 会計時の**支払い方法選択** UI
+3. ウェイター UI のスマレジ完全準拠の細部調整
+4. PostgreSQL 本番化（Neon / Render / docker-compose.yml）
 
 ## iPhone Cursor での使い方
 
