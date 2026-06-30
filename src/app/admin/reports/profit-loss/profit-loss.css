@@ -1,0 +1,364 @@
+/* 損益リポート — 喫茶店 × 高級RPG帳票 */
+
+.profit-loss-scene {
+  --pl-bg: #080706;
+  --pl-panel: #12100e;
+  --pl-panel-edge: #2a241c;
+  --pl-gold: #d4af37;
+  --pl-gold-light: #f0d78c;
+  --pl-gold-dim: #8a7340;
+  --pl-cream: #f3ece0;
+  --pl-muted: #9a9288;
+  --pl-profit: #6ecf9a;
+  --pl-cost: #d47373;
+  --pl-revenue: #e8b84a;
+
+  position: relative;
+  min-height: calc(100vh - 2rem);
+  margin: -1.5rem -2rem;
+  padding: 2.5rem 1.5rem 3rem;
+  color: var(--pl-cream);
+  font-family: var(--font-geist-sans), "Hiragino Sans", sans-serif;
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -20%, rgba(212, 175, 55, 0.12), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(110, 207, 154, 0.06), transparent 50%),
+    linear-gradient(180deg, #0c0a09 0%, var(--pl-bg) 40%, #060504 100%);
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .profit-loss-scene {
+    margin: -2rem;
+    padding: 3rem 2.5rem 4rem;
+  }
+}
+
+.profit-loss-scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.profit-loss-scene > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── 装飾フレームパネル ── */
+.pl-frame {
+  position: relative;
+  background: linear-gradient(165deg, rgba(24, 21, 18, 0.95) 0%, rgba(14, 12, 10, 0.98) 100%);
+  border: 1px solid var(--pl-panel-edge);
+  box-shadow:
+    inset 0 1px 0 rgba(240, 215, 140, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 24px 48px rgba(0, 0, 0, 0.45);
+}
+
+.pl-frame::before,
+.pl-frame::after {
+  content: "";
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-color: var(--pl-gold-dim);
+  border-style: solid;
+  pointer-events: none;
+}
+
+.pl-frame::before {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+
+.pl-frame::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 2px 2px 0;
+}
+
+.pl-frame-corners {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pl-frame-corners span:nth-child(1) {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 24px;
+  height: 24px;
+  border-top: 2px solid var(--pl-gold-dim);
+  border-right: 2px solid var(--pl-gold-dim);
+}
+
+.pl-frame-corners span:nth-child(2) {
+  position: absolute;
+  bottom: -1px;
+  left: -1px;
+  width: 24px;
+  height: 24px;
+  border-bottom: 2px solid var(--pl-gold-dim);
+  border-left: 2px solid var(--pl-gold-dim);
+}
+
+.pl-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--pl-gold);
+}
+
+.pl-section-title::before,
+.pl-section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--pl-gold-dim), transparent);
+}
+
+/* ── ランク紋章 ── */
+.pl-rank-emblem {
+  position: relative;
+  width: 11rem;
+  height: 11rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pl-rank-emblem-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--pl-panel), var(--pl-panel)) padding-box,
+    conic-gradient(from 200deg, var(--pl-gold-dim), var(--pl-gold-light), var(--pl-gold), var(--pl-gold-dim)) border-box;
+  animation: pl-ring-rotate 24s linear infinite;
+}
+
+.pl-rank-emblem-ring::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  box-shadow: inset 0 0 30px rgba(212, 175, 55, 0.08);
+}
+
+@keyframes pl-ring-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pl-rank-emblem-core {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 7.5rem;
+  height: 7.5rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.12), transparent 45%),
+    linear-gradient(145deg, #2a2218 0%, #14100c 100%);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    inset 0 2px 4px rgba(255, 255, 255, 0.06);
+}
+
+.pl-rank-letter {
+  font-size: 3.25rem;
+  font-weight: 800;
+  line-height: 1;
+  background: linear-gradient(180deg, var(--pl-gold-light) 0%, var(--pl-gold) 50%, #a08030 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 8px rgba(212, 175, 55, 0.35));
+}
+
+.pl-rank-title {
+  margin-top: 0.35rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: var(--pl-muted);
+}
+
+/* ── 数値ディスプレイ ── */
+.pl-metric-hero {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pl-metric-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--pl-muted);
+}
+
+/* ── ゲージ ── */
+.pl-gauge-track {
+  height: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.pl-gauge-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 0 12px var(--gauge-glow, transparent);
+}
+
+.pl-gauge-fill--revenue {
+  background: linear-gradient(90deg, #8a6020, var(--pl-revenue));
+  --gauge-glow: rgba(232, 184, 74, 0.4);
+}
+
+.pl-gauge-fill--cost {
+  background: linear-gradient(90deg, #6b3030, var(--pl-cost));
+  --gauge-glow: rgba(212, 115, 115, 0.35);
+}
+
+.pl-gauge-fill--profit {
+  background: linear-gradient(90deg, #2d6b4a, var(--pl-profit));
+  --gauge-glow: rgba(110, 207, 154, 0.4);
+}
+
+.pl-gauge-fill--target {
+  background: linear-gradient(90deg, #4a3870, #c9a227);
+  --gauge-glow: rgba(212, 175, 55, 0.3);
+}
+
+/* ── カテゴリ行 ── */
+.pl-category-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.875rem 0;
+  border-bottom: 1px solid rgba(42, 36, 28, 0.8);
+}
+
+.pl-category-row:last-child {
+  border-bottom: none;
+}
+
+.pl-category-rank {
+  width: 1.5rem;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.75rem;
+  color: var(--pl-gold-dim);
+}
+
+/* ── 日別リスト ── */
+.pl-day-row {
+  display: grid;
+  grid-template-columns: 4.5rem 2rem 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.625rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  transition: background 0.15s;
+}
+
+.pl-day-row:hover {
+  background: rgba(212, 175, 55, 0.04);
+}
+
+.pl-day-bar-wrap {
+  height: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.pl-day-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #6b5020, var(--pl-gold));
+  border-radius: 2px;
+  transition: width 0.8s ease-out;
+}
+
+/* ── 変化率バッジ ── */
+.pl-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pl-delta--up {
+  color: var(--pl-profit);
+  background: rgba(110, 207, 154, 0.1);
+  border: 1px solid rgba(110, 207, 154, 0.2);
+}
+
+.pl-delta--down {
+  color: var(--pl-cost);
+  background: rgba(212, 115, 115, 0.1);
+  border: 1px solid rgba(212, 115, 115, 0.2);
+}
+
+/* ── 印刷ボタン ── */
+.pl-print-btn {
+  padding: 0.625rem 1.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--pl-gold-light);
+  background: linear-gradient(180deg, rgba(42, 36, 28, 0.9), rgba(20, 18, 16, 0.95));
+  border: 1px solid var(--pl-gold-dim);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.pl-print-btn:hover {
+  border-color: var(--pl-gold);
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.15);
+}
+
+@media print {
+  .profit-loss-scene {
+    margin: 0;
+    padding: 1rem;
+    background: white;
+    color: black;
+    min-height: auto;
+  }
+
+  .pl-frame {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+
+  .pl-rank-emblem-ring {
+    animation: none;
+  }
+}
