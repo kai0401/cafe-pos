@@ -59,7 +59,18 @@ npm run db:push
 npm run dev
 ```
 
-ブラウザで http://localhost:3000/admin/dashboard を開く。
+ブラウザで http://localhost:3000/admin/dashboard を開く（ポートが塞がれていれば 3002）。
+
+## ウェイター（Phase 2）
+
+| URL | 内容 |
+|-----|------|
+| `/waiter` | ホーム |
+| `/waiter/tables` | テーブル一覧 |
+| `/waiter/order/[tableId]/categories` | 注文（カテゴリ） |
+| `/waiter/history` | 取引履歴 |
+
+詳細は [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) を参照（iPhone Cursor 共有用）。
 
 スマホからローカル開発サーバーを見る場合は `localhost` ではなく、PC の LAN IP を使います（例: `http://192.168.1.10:3000/waiter/tables`）。PC とスマホは同じ Wi‑Fi に接続してください。
 
