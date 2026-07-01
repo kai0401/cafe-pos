@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "vercel-build": "prisma generate && prisma db push && next build",
+    "vercel-build": "prisma generate && prisma db push && tsx scripts/seed-demo.ts && next build",
     "start": "next start",
     "lint": "eslint",
     "db:up": "docker compose up -d",
@@ -16,6 +16,7 @@
     "db:clean-demo": "tsx scripts/clean-demo-sales.ts",
     "weather:sync": "tsx scripts/sync-weather.ts",
     "preview:reset": "node -e \"require('fs').rmSync('.preview-data',{recursive:true,force:true})\"",
+    "preview:db": "node scripts/preview-db.mjs",
     "preview:public": "node scripts/preview-public.mjs",
     "preview:tunnel": "node scripts/preview-tunnel.mjs",
     "preview:keepalive": "node scripts/preview-keepalive.mjs",
