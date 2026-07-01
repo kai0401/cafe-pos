@@ -13,6 +13,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx scripts/seed-demo.ts",
     "db:import": "tsx scripts/import-csv.ts",
+    "db:pull-csv": "bash scripts/pull-and-import-csv.sh",
     "db:clean-demo": "tsx scripts/clean-demo-sales.ts",
     "weather:sync": "tsx scripts/sync-weather.ts",
     "preview:reset": "node -e \"require('fs').rmSync('.preview-data',{recursive:true,force:true})\"",
