@@ -4,16 +4,37 @@
 
 ## 常時プレビュー（スマホからもアクセス可）
 
-### いま見れるURL
+### スマホ用（おすすめ・パスワード画面なし）
+
+Cloud Agent 実行中は `npm run preview:mobile` で公開します。  
+**IP入力や loca.lt の確認画面は出ません。** そのまま開けます。
+
+最新URLは `PREVIEW_URL.json` を参照してください。
+
+### 固定URLで出先からいつでも見る（本番向け）
+
+一時トンネルは切れます。**出先から毎回簡単に見るなら Vercel デプロイが確実です。**
+
+1. [Neon](https://neon.tech) で PostgreSQL を作成（無料）
+2. 下のボタンで Vercel にデプロイ（`DATABASE_URL` に Neon の接続文字列）
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fkai0401%2Fcafe-pos&project-name=cafe-pos&env=DATABASE_URL&envDescription=Neon%20PostgreSQL%20%E6%8E%A5%E7%B6%9A%E6%96%87%E5%AD%97%E5%88%97&envLink=https%3A%2F%2Fneon.tech&demo-title=cafe-pos&demo-description=%E5%96%B6%E6%A5%AD%E7%94%A8%20POS%20MVP)
+
+デプロイ後はこのURLをスマホのホーム画面に追加:
 
 | 画面 | URL |
 |------|-----|
-| ウェイター（テーブル一覧） | https://spyware-protected-senior-standards.trycloudflare.com/waiter/tables |
-| 管理ダッシュボード | https://spyware-protected-senior-standards.trycloudflare.com/admin/dashboard |
+| ウェイター（テーブル一覧） | `https://<your-app>.vercel.app/waiter/tables` |
+| 管理ダッシュボード | `https://<your-app>.vercel.app/admin/dashboard` |
 
-空いているテーブル（T1 など）をタップすると、人数選択ダイアログが表示されます。
+### クラウド開発用（一時URL）
 
-> この URL は一時的なものです。開けなくなったら `npm run preview:tunnel` で新しい URL を発行してください。
+```bash
+npm run preview:public   # DB込み本番ビルド + トンネル
+npm run preview:mobile   # スマホ向け（Pinggy・パスワードなし）
+```
+
+> `trycloudflare.com` / `loca.lt` は切れたり確認画面が出たりします。スマホでは `preview:mobile` を使ってください。
 
 ### ワンコマンドで公開プレビュー
 

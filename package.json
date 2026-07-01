@@ -20,6 +20,7 @@
     "preview:tunnel": "node scripts/preview-tunnel.mjs",
     "preview:keepalive": "node scripts/preview-keepalive.mjs",
     "preview:stable": "node scripts/preview-stable.mjs",
+    "preview:mobile": "node scripts/preview-mobile.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {
