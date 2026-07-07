@@ -32,11 +32,12 @@ export function parseSmaregiMemo(memo: string): SmaregiMemo {
 
 export function detectCsvType(headers: string[]): "PRODUCT_MASTER" | "TRANSACTION_DETAIL" | "UNKNOWN" {
   const headerSet = new Set(headers);
-  if (headerSet.has("商品ID") && headerSet.has("商品名") && headerSet.has("商品単価")) {
-    return "PRODUCT_MASTER";
-  }
+  // 取引CSVは商品ID・商品名・商品単価も含むため、先に取引系の列で判定する
   if (headerSet.has("取引ID") && headerSet.has("取引明細ID") && headerSet.has("商品名")) {
     return "TRANSACTION_DETAIL";
+  }
+  if (headerSet.has("商品ID") && headerSet.has("商品名") && headerSet.has("商品単価")) {
+    return "PRODUCT_MASTER";
   }
   return "UNKNOWN";
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { formatInTimeZone } from "date-fns-tz";
 import { DataSource, TransactionType } from "@prisma/client";
+import { getTransactionsForDate } from "@/domain/sales/sales-service";
 import { getDefaultStore, prisma } from "@/lib/prisma";
 import { getDayOfWeekJST } from "@/lib/datetime";
 import { getClosedDays } from "@/lib/store-config";
@@ -35,12 +36,21 @@ export async function GET(request: Request) {
   const store = await getDefaultStore();
   const { searchParams } = new URL(request.url);
   const month = searchParams.get("month");
+  const date = searchParams.get("date");
   const closedDays = getClosedDays(store.regularClosedDays);
+
+  if (date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return NextResponse.json({ error: "date (YYYY-MM-DD) が必要です" }, { status: 400 });
+    }
+    const transactions = await getTransactionsForDate(store.id, date);
+    return NextResponse.json(transactions);
+  }
 
   const txs = await prisma.salesTransaction.findMany({
     where: {
       storeId: store.id,
-      dataSource: DataSource.SMAREGI,
+      dataSource: { in: [DataSource.SMAREGI, DataSource.OWN_POS] },
       transactionType: TransactionType.SALE,
     },
     select: { businessDate: true, totalAmount: true },

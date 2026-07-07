@@ -3,13 +3,13 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --waiter-width: 390px;
+  --waiter-width: min(390px, 100vw);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-noto-sans);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -28,11 +28,195 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-noto-sans), "Hiragino Sans", "Yu Gothic", sans-serif;
+}
+
+/* ── 管理画面：喫茶店・編集系トーン ── */
+.admin-shell {
+  --admin-bg: #ede6db;
+  --admin-paper: #faf6f0;
+  --admin-paper-raised: #fffcf8;
+  --admin-ink: #2c2219;
+  --admin-muted: #8a7d70;
+  --admin-line: #ddd4c8;
+  --admin-accent: #9a5c38;
+  --admin-accent-hover: #7f4a2c;
+  --admin-accent-soft: #f0e4d8;
+  --admin-sage: #5c6b54;
+  --admin-sage-soft: #e8ede5;
+  --admin-vermillion: #b84a3a;
+
+  background: var(--admin-bg);
+  color: var(--admin-ink);
+  font-family: var(--font-noto-sans), "Hiragino Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.admin-shell .admin-brand-serif,
+.admin-shell h1,
+.admin-shell h2.admin-title {
+  font-family: var(--font-noto-serif), "Hiragino Mincho ProN", serif;
+  font-weight: 500;
+}
+
+.admin-sidebar {
+  background: var(--admin-paper);
+  border-bottom: 1px solid var(--admin-line);
+}
+
+@media (min-width: 768px) {
+  .admin-sidebar {
+    border-bottom: none;
+    border-right: 1px solid var(--admin-line);
+  }
+}
+
+.admin-main {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(154, 92, 56, 0.06), transparent),
+    var(--admin-bg);
+}
+
+.admin-nav-link {
+  display: block;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  color: var(--admin-muted);
+  transition: color 0.15s, background 0.15s;
+}
+
+.admin-nav-link:hover {
+  color: var(--admin-ink);
+  background: rgba(44, 34, 25, 0.04);
+}
+
+.admin-nav-link--active {
+  color: var(--admin-ink);
+  background: var(--admin-accent-soft);
+  box-shadow: inset 2px 0 0 var(--admin-accent);
+}
+
+.admin-card {
+  border: 1px solid var(--admin-line);
+  border-radius: 12px;
+  background: var(--admin-paper-raised);
+  box-shadow: 0 1px 2px rgba(44, 34, 25, 0.04);
+}
+
+.admin-input {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--admin-line);
+  background: var(--admin-paper-raised);
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--admin-ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.admin-input:focus {
+  border-color: var(--admin-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(154, 92, 56, 0.12);
+}
+
+.admin-input::placeholder {
+  color: var(--admin-muted);
+}
+
+.admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 9999px;
+  padding: 0.5rem 1.125rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.admin-btn--primary {
+  background: var(--admin-ink);
+  color: var(--admin-paper-raised);
+}
+
+.admin-btn--primary:hover:not(:disabled) {
+  background: #1a1410;
+}
+
+.admin-btn--primary:disabled {
+  opacity: 0.45;
+}
+
+.admin-btn--ghost {
+  border: 1px solid var(--admin-line);
+  background: transparent;
+  color: var(--admin-muted);
+}
+
+.admin-btn--ghost:hover {
+  border-color: var(--admin-accent);
+  color: var(--admin-ink);
+}
+
+.admin-btn--accent {
+  background: var(--admin-accent);
+  color: var(--admin-paper-raised);
+}
+
+.admin-btn--accent:hover:not(:disabled) {
+  background: var(--admin-accent-hover);
+}
+
+.admin-label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--admin-muted);
+}
+
+.admin-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  background: var(--admin-accent-soft);
+  color: var(--admin-accent);
+}
+
+.admin-tag--sage {
+  background: var(--admin-sage-soft);
+  color: var(--admin-sage);
+}
+
+.admin-progress {
+  height: 2px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--admin-line);
+}
+
+.admin-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--admin-accent);
+  transition: width 0.3s ease;
 }
 
 /* ウェイター: iPhone サイズ（390pt 基準） */
 .waiter-shell {
+  --waiter-header-action-min-h: 2.75rem;
+  --waiter-bottom-bar-h: calc(3.25rem + env(safe-area-inset-bottom, 0px));
   font-family:
     -apple-system,
     BlinkMacSystemFont,
@@ -49,6 +233,68 @@ body {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
+/* 固定 h-11 と pt-safe の併用で文字が切れるのを防ぐ */
+.waiter-shell .waiter-top-bar {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  min-height: calc(2.75rem + env(safe-area-inset-top, 0px));
+}
+
+.waiter-shell .waiter-header-btn {
+  display: inline-flex;
+  min-height: var(--waiter-header-action-min-h);
+  align-items: center;
+}
+
+.waiter-shell .waiter-toast {
+  top: calc(0.75rem + env(safe-area-inset-top, 0px));
+}
+
+.waiter-shell .waiter-scroll-pad-bottom {
+  padding-bottom: var(--waiter-bottom-bar-h);
+}
+
+.waiter-shell .waiter-fixed-bottom {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  z-index: 30;
+  width: 100%;
+  max-width: var(--waiter-width);
+  transform: translateX(-50%);
+}
+
 .waiter-shell .pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.waiter-shell .px-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* キッチン: iPad / タブレット常時表示 */
+.kitchen-shell {
+  -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
+}
+
+.kitchen-shell .pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.kitchen-shell .kitchen-top-bar {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  min-height: calc(2.75rem + env(safe-area-inset-top, 0px));
+}
+
+.kitchen-shell .kitchen-header-btn {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+}
+
+.kitchen-shell .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }

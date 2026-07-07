@@ -3,9 +3,20 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { WaiterHeader } from "@/components/waiter/waiter-ui";
+import { waiterFetch } from "@/lib/waiter-api";
 
 const ORANGE = "#e8912d";
 const ORANGE_LIGHT = "rgba(255,255,255,0.12)";
+
+function IconInstall() {
+  return (
+    <svg width="56" height="56" viewBox="0 0 48 48" fill="none" stroke="white" strokeWidth="2">
+      <rect x="14" y="6" width="20" height="28" rx="4" />
+      <path d="M20 34h8" strokeLinecap="round" />
+      <path d="M24 18v12M20 26l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 function IconOrder() {
   return (
@@ -98,21 +109,33 @@ function Tile({
 
 export default function WaiterHomePage() {
   const [soldOutCount, setSoldOutCount] = useState(0);
+  const [staffName, setStaffName] = useState("管理者");
 
   useEffect(() => {
-    fetch("/api/waiter/menu")
+    waiterFetch("/api/waiter/menu", { redirectOn401: false })
       .then((r) => r.json())
       .then((cats: { soldOutCount?: number }[]) => {
         setSoldOutCount(cats.reduce((s, c) => s + (c.soldOutCount ?? 0), 0));
       })
       .catch(() => {});
+    try {
+      const saved: string[] = JSON.parse(localStorage.getItem("waiter-staff-names") ?? "[]");
+      if (saved[0]) setStaffName(saved[0]);
+    } catch {
+      // ignore
+    }
   }, []);
 
   return (
     <div className="flex min-h-screen flex-col pb-14" style={{ backgroundColor: ORANGE }}>
-      <WaiterHeader title="メニュー" />
+      <WaiterHeader title="ホーム" />
 
       <div className="flex-1 px-3 pt-3">
+        {/* アプリに追加 */}
+        <div className="mb-2 overflow-hidden rounded-md">
+          <Tile href="/waiter/install" label="アプリに追加" icon={<IconInstall />} large />
+        </div>
+
         {/* 注文 — 大ボタン */}
         <div className="mb-2 overflow-hidden rounded-md">
           <Tile href="/waiter/tables" label="注文" icon={<IconOrder />} large />
@@ -121,13 +144,13 @@ export default function WaiterHomePage() {
         {/* 取引履歴 | 店舗 | メニュー */}
         <div className="mb-2 grid grid-cols-3 gap-px overflow-hidden rounded-md bg-white/20">
           <Tile href="/waiter/history" label="取引履歴" icon={<IconBook />} />
-          <Tile href="/admin/dashboard" label="店舗" icon={<IconStore />} />
-          <Tile href="/admin/products" label="メニュー" icon={<IconMenu />} badge={soldOutCount} />
+          <Tile href="/waiter/connect" label="接続" icon={<IconStore />} />
+          <Tile href="/waiter/menu-status" label="メニュー" icon={<IconMenu />} badge={soldOutCount} />
         </div>
 
         {/* ジョブリスト | 設定 */}
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md bg-white/20">
-          <Tile href="/kitchen" label="ジョブリスト" icon={<IconJob />} />
+          <Tile href="/kitchen/open" label="キッチン" icon={<IconJob />} />
           <Tile href="/waiter/settings" label="設定" icon={<IconSettings />} />
         </div>
 
@@ -135,15 +158,14 @@ export default function WaiterHomePage() {
       </div>
 
       {/* 下部バー */}
-      <div className="pb-safe fixed bottom-0 left-0 right-0 mx-auto w-full max-w-[var(--waiter-width)] border-t border-stone-200 bg-[#f5f5f5]">
+      <div className="waiter-fixed-bottom pb-safe border-t border-stone-200 bg-[#f5f5f5]">
         <div className="flex items-center gap-3 px-4 py-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-300 text-stone-600">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
             </svg>
           </div>
-          <span className="text-[15px] text-stone-700">管理者</span>
-          <span className="ml-auto text-stone-400">›</span>
+          <span className="text-[15px] text-stone-700">{staffName}</span>
         </div>
       </div>
     </div>

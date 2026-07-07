@@ -45,6 +45,7 @@ prisma/*.db-journal
 PREVIEW_URL.json
 !data/smaregi/
 !data/smaregi/**
+.shop-remote-url.json
 
 # vercel
 .vercel
@@ -52,3 +53,15 @@ PREVIEW_URL.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# printer (local device config)
+printer-config.json
+
+# receipt images (local uploads)
+uploads/
+
+# tesseract language data (downloaded at runtime)
+*.traineddata
+
+# db backups (local shop Mac)
+backups/

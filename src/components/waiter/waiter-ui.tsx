@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 const ORANGE = "#e8912d";
 
@@ -14,29 +14,31 @@ export function WaiterHeader({
   backHref?: string;
   onRefresh?: () => void;
 }) {
-  const router = useRouter();
-
   return (
     <header
-      className="pt-safe sticky top-0 z-20 flex h-11 shrink-0 items-center justify-between px-3 text-white"
+      className="waiter-top-bar sticky top-0 z-20 flex shrink-0 items-center justify-between px-3 text-white"
       style={{ backgroundColor: ORANGE }}
     >
       {backHref ? (
-        <Link href={backHref} className="min-w-[56px] text-[15px] leading-none">
+        <Link href={backHref} className="waiter-header-btn min-w-[56px] text-[15px] leading-none">
           ‹ 戻る
         </Link>
       ) : (
         <div className="min-w-[56px]" />
       )}
       <h1 className="truncate text-[15px] font-semibold">{title}</h1>
-      <button
-        type="button"
-        onClick={onRefresh ?? (() => router.refresh())}
-        className="flex min-w-[56px] justify-end text-[18px] leading-none"
-        aria-label="更新"
-      >
-        ↻
-      </button>
+      {onRefresh ? (
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="waiter-header-btn flex min-w-[56px] items-center justify-end text-[18px] leading-none"
+          aria-label="更新"
+        >
+          ↻
+        </button>
+      ) : (
+        <div className="min-w-[56px]" />
+      )}
     </header>
   );
 }
@@ -70,7 +72,7 @@ export function WaiterRow({
         </div>
         {sub && <p className="mt-0.5 text-[12px] leading-tight text-stone-400">{sub}</p>}
       </div>
-      <span className="ml-2 shrink-0 text-[16px] text-stone-300">›</span>
+      {href && <span className="ml-2 shrink-0 text-[16px] text-stone-300">›</span>}
     </>
   );
 
@@ -90,7 +92,7 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export function WaiterBottomBar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="pb-safe fixed bottom-0 left-0 right-0 z-30 mx-auto w-full max-w-[var(--waiter-width)] border-t border-stone-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+    <div className="waiter-fixed-bottom pb-safe z-30 border-t border-stone-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
       {children}
     </div>
   );
@@ -124,12 +126,27 @@ export function PrimaryButton({
   );
 }
 
-export function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+export function Toast({
+  message,
+  onClose,
+  autoHideMs = 2800,
+}: {
+  message: string;
+  onClose: () => void;
+  autoHideMs?: number;
+}) {
+  useEffect(() => {
+    if (!message || autoHideMs <= 0) return;
+    const t = setTimeout(onClose, autoHideMs);
+    return () => clearTimeout(t);
+  }, [message, autoHideMs, onClose]);
+
   if (!message) return null;
   return (
     <div
-      className="fixed left-3 right-3 top-14 z-50 mx-auto max-w-[var(--waiter-width)] rounded-lg bg-stone-900/90 px-3 py-2.5 text-center text-[13px] text-white"
+      className="waiter-toast fixed left-3 right-3 z-50 mx-auto max-w-[var(--waiter-width)] rounded-lg bg-stone-900/90 px-3 py-2.5 text-center text-[13px] text-white shadow-lg"
       onClick={onClose}
+      role="status"
     >
       {message}
     </div>

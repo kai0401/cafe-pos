@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatSmaregiYen } from "@/lib/format";
+import { formatYen } from "@/lib/format";
 
 const BLUE = "#007aff";
 const BORDER = "#e0e0e0";
@@ -23,7 +23,7 @@ function AmountBlock({
         className="mt-0.5 text-[18px] font-bold leading-none tabular-nums tracking-tight"
         style={{ color }}
       >
-        {formatSmaregiYen(total)}
+        {formatYen(total)}
       </p>
     </div>
   );
@@ -58,20 +58,19 @@ export function HistoryDayRow({
   count,
   total,
   isClosedDay,
+  href,
 }: {
   date: string;
   count: number;
   total: number;
   isClosedDay?: boolean;
+  href?: string;
 }) {
   const empty = count === 0;
   const muted = empty;
 
-  return (
-    <div
-      className={`flex min-h-[44px] items-center gap-2 border-b px-4 py-2.5 ${muted ? "bg-[#fafafa]" : "bg-white"}`}
-      style={{ borderColor: BORDER }}
-    >
+  const content = (
+    <>
       <div className="min-w-0 flex-1">
         <p
           className={`text-[15px] font-bold leading-tight ${muted ? "text-stone-400" : "text-black"}`}
@@ -83,6 +82,23 @@ export function HistoryDayRow({
         )}
       </div>
       <AmountBlock count={count} total={total} muted={muted} />
+      {href && !empty && <span className="shrink-0 text-[16px] font-light text-[#c7c7cc]">›</span>}
+    </>
+  );
+
+  const className = `flex min-h-[44px] items-center gap-2 border-b px-4 py-2.5 ${muted ? "bg-[#fafafa]" : "bg-white"}`;
+
+  if (href && !empty) {
+    return (
+      <Link href={href} className={`${className} active:bg-stone-50`} style={{ borderColor: BORDER }}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <div className={className} style={{ borderColor: BORDER }}>
+      {content}
     </div>
   );
 }

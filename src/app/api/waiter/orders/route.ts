@@ -1,30 +1,50 @@
-import { KitchenTicketStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import {
+  addAndSendOrderItems,
   addOrderItems,
   cancelPendingOrder,
   cancelTableTransaction,
   completeOrderCheckout,
   getTableOrder,
+  markItemServed,
   openTableOrder,
   sendOrderToKitchen,
+  updateOrderMeta,
   updatePendingItemQuantity,
 } from "@/domain/order/order-service";
 import { ensureWaiterSetup } from "@/lib/waiter-setup";
-import { prisma } from "@/lib/prisma";
+import { getDefaultStore, prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
-  const tableId = new URL(request.url).searchParams.get("tableId");
-  if (!tableId) return NextResponse.json({ error: "tableId required" }, { status: 400 });
-  const order = await getTableOrder(tableId);
-  return NextResponse.json(order);
+  try {
+    const tableId = new URL(request.url).searchParams.get("tableId");
+    if (!tableId) return NextResponse.json({ error: "tableId required" }, { status: 400 });
+    const order = await getTableOrder(tableId);
+    return NextResponse.json(order);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "注文取得エラー" },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: Request) {
   try {
-    const store = await ensureWaiterSetup();
     const body = await request.json();
     const { action, tableId, orderId, items, customerCount, itemId, quantity } = body;
+
+    if (action === "addAndSend" && tableId && items?.length) {
+      const store = await ensureWaiterSetup();
+      const order = await addAndSendOrderItems(tableId, store.id, items);
+      return NextResponse.json(order);
+    }
+
+    const needsStore =
+      action === "checkout" ||
+      action === "open" ||
+      (tableId && items?.length && !action);
+    const store = needsStore ? await ensureWaiterSetup() : await getDefaultStore();
 
     if (action === "updateGuests" && tableId && customerCount !== undefined) {
       const order = await getTableOrder(tableId);
@@ -34,6 +54,20 @@ export async function POST(request: Request) {
         data: { customerCount: Number(customerCount) },
       });
       return NextResponse.json(await getTableOrder(tableId));
+    }
+
+    if (action === "updateMeta" && orderId) {
+      const order = await updateOrderMeta(orderId, {
+        staffName: body.staffName !== undefined ? body.staffName || null : undefined,
+        customerSegment:
+          body.customerSegment !== undefined ? body.customerSegment || null : undefined,
+      });
+      return NextResponse.json(order);
+    }
+
+    if (action === "serveItem" && itemId) {
+      const order = await markItemServed(itemId);
+      return NextResponse.json(order);
     }
 
     if (action === "updateMemo" && orderId && body.note !== undefined) {
@@ -46,7 +80,10 @@ export async function POST(request: Request) {
     }
 
     if (action === "checkout" && orderId) {
-      const result = await completeOrderCheckout(orderId, store.id);
+      const method = body.paymentMethod ?? "CASH";
+      const tendered = body.tendered ? Number(body.tendered) : undefined;
+      const discount = body.discount ? Number(body.discount) : 0;
+      const result = await completeOrderCheckout(orderId, store.id, method, tendered, discount);
       return NextResponse.json(result);
     }
 

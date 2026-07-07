@@ -1,11 +1,11 @@
+import { ProductTable } from "@/components/admin/product-table";
+import { EmptyState, PageHeader } from "@/components/admin/ui";
 import { prisma } from "@/lib/prisma";
-import { EmptyState, PageHeader, StatTable } from "@/components/admin/ui";
-import { formatYen } from "@/lib/format";
 
 export default async function ProductsPage() {
   const products = await prisma.product.findMany({
     include: { category: true, externalMapping: true },
-    orderBy: { name: "asc" },
+    orderBy: [{ category: { sortOrder: "asc" } }, { name: "asc" }],
   });
 
   if (products.length === 0) {
@@ -17,20 +17,15 @@ export default async function ProductsPage() {
     );
   }
 
+  const soldOut = products.filter((p) => p.status === "SOLD_OUT").length;
+
   return (
     <>
-      <PageHeader title="商品管理" description={`${products.length}件の商品`} />
-      <StatTable
-        headers={["商品名", "カテゴリ", "価格", "原価", "状態", "スマレジID"]}
-        rows={products.map((p) => [
-          p.name,
-          p.category?.name ?? "—",
-          p.priceDineIn,
-          p.costAmount ?? "—",
-          p.status,
-          p.externalMapping[0]?.externalProductId ?? "—",
-        ])}
+      <PageHeader
+        title="商品管理"
+        description={`${products.length}件の商品${soldOut > 0 ? `（売切 ${soldOut}件）` : ""} · 状態ボタンで 販売中 → 売切 → 非表示 を切替`}
       />
+      <ProductTable products={products} />
     </>
   );
 }

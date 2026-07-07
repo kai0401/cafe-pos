@@ -3,6 +3,7 @@ services:
     name: cafe-pos
     runtime: node
     plan: free
+    healthCheckPath: /api/health
     buildCommand: npm install && npm run vercel-build
     startCommand: npm start
     envVars:
@@ -12,6 +13,16 @@ services:
         fromDatabase:
           name: cafe-pos-db
           property: connectionString
+      - key: ADMIN_PIN
+        sync: false
+      - key: STAFF_PIN
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: STORES_API_KEY
+        sync: false
 
 databases:
   - name: cafe-pos-db

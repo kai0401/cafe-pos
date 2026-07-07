@@ -382,8 +382,13 @@ export async function runImportJob(
 }
 
 export async function aggregateSales(storeId: string, dataSource: DataSource): Promise<void> {
+  // OWN_POS は返金（負の金額）も集計に反映する。SMAREGI は突合済みの SALE のみ
+  const types =
+    dataSource === DataSource.OWN_POS
+      ? [TransactionType.SALE, TransactionType.REFUND]
+      : [TransactionType.SALE];
   const transactions = await prisma.salesTransaction.findMany({
-    where: { storeId, dataSource, transactionType: TransactionType.SALE },
+    where: { storeId, dataSource, transactionType: { in: types } },
     include: { items: true, payments: true },
   });
 
@@ -401,14 +406,16 @@ export async function aggregateSales(storeId: string, dataSource: DataSource): P
   const productMap = new Map<string, { name: string; category: string | null; qty: number; sales: number }>();
 
   for (const tx of transactions) {
+    const isRefund = tx.transactionType === TransactionType.REFUND;
     const dateKey = tx.businessDate.toISOString().slice(0, 10);
     if (!dailyMap.has(dateKey)) {
       dailyMap.set(dateKey, { netSales: 0, customerCount: 0, orderCount: 0, itemCount: 0, dineIn: 0, takeout: 0 });
     }
     const daily = dailyMap.get(dateKey)!;
     daily.netSales += tx.totalAmount;
-    daily.customerCount += tx.customerCount;
-    daily.orderCount += 1;
+    // 返金は件数・客数にカウントしない（金額のみ相殺）
+    daily.customerCount += isRefund ? 0 : tx.customerCount;
+    daily.orderCount += isRefund ? 0 : 1;
     daily.itemCount += tx.items.reduce((s, i) => s + i.quantity, 0);
     if (tx.eatInType === EatInType.TAKEOUT) daily.takeout += tx.totalAmount;
     else daily.dineIn += tx.totalAmount;
@@ -420,8 +427,8 @@ export async function aggregateSales(storeId: string, dataSource: DataSource): P
     }
     const hourly = hourlyMap.get(hourKey)!;
     hourly.netSales += tx.totalAmount;
-    hourly.customerCount += tx.customerCount;
-    hourly.orderCount += 1;
+    hourly.customerCount += isRefund ? 0 : tx.customerCount;
+    hourly.orderCount += isRefund ? 0 : 1;
 
     for (const p of tx.payments) {
       const payKey = `${dateKey}-${p.method}`;

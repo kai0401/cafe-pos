@@ -35,6 +35,7 @@ export default async function DailySalesPage() {
       </section>
       <StatTable
         headers={["日付", "曜日", "売上", "客数", "注文数", "客単価"]}
+        yenColumns={[2, 5]}
         rows={daily
           .slice()
           .reverse()

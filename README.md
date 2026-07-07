@@ -1,51 +1,48 @@
-# 喫茶店 POS 管理（MVP-1）
+# 喫茶店 POS
 
-スマレジCSVの取り込みと売上分析ダッシュボード。
+スマレジ代替の注文・会計・売上分析システム。
 
-## 常時プレビュー（スマホからもアクセス可）
+## 店舗導入（クラウド・Mac 不要）
 
-### スマホ用（おすすめ・パスワード画面なし）
+スマレジ切替手順は **[ROLLOUT.md](./ROLLOUT.md)** を参照。
 
-Cloud Agent 実行中は `npm run preview:mobile` で公開します。  
-**IP入力や loca.lt の確認画面は出ません。** そのまま開けます。
+```bash
+npm run cloud:deploy      # デプロイ手順を表示
+npm run rollout:check     # 環境変数チェック（本番）
+```
 
-最新URLは `PREVIEW_URL.json` を参照してください。
-
-### 固定URLで出先からいつでも見る（本番向け）
-
-一時トンネルは切れます。**出先から毎回簡単に見るなら Vercel デプロイが確実です。**
-
-1. [Neon](https://neon.tech) で PostgreSQL を作成（無料）
-2. 下のボタンで Vercel にデプロイ（`DATABASE_URL` に Neon の接続文字列）
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fkai0401%2Fcafe-pos&project-name=cafe-pos&env=DATABASE_URL&envDescription=Neon%20PostgreSQL%20%E6%8E%A5%E7%B6%9A%E6%96%87%E5%AD%97%E5%88%97&envLink=https%3A%2F%2Fneon.tech&demo-title=cafe-pos&demo-description=%E5%96%B6%E6%A5%AD%E7%94%A8%20POS%20MVP)
-
-デプロイ後はこのURLをスマホのホーム画面に追加:
+**本番URL例（Vercel + Neon）**
 
 | 画面 | URL |
 |------|-----|
-| ウェイター（テーブル一覧） | `https://<your-app>.vercel.app/waiter/tables` |
-| 管理ダッシュボード | `https://<your-app>.vercel.app/admin/dashboard` |
+| ウェイター | `https://<app>.vercel.app/waiter/tables` |
+| キッチン | `https://<app>.vercel.app/kitchen` |
+| 管理 | `https://<app>.vercel.app/admin/login` |
+| QRオーダー | `https://<app>.vercel.app/qr/...` |
 
-### クラウド開発用（一時URL）
+1. [Neon](https://neon.tech) で PostgreSQL を作成
+2. Vercel にデプロイ（`DATABASE_URL`, `PUBLIC_BASE_URL`, `ADMIN_PIN`, `STAFF_PIN` を設定）
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fkai0401%2Fcafe-pos&project-name=cafe-pos&env=DATABASE_URL&envDescription=Neon%20PostgreSQL%20%E6%8E%A5%E7%B6%9A%E6%96%87%E5%AD%97%E5%88%97&envLink=https%3A%2F%2Fneon.tech&demo-title=cafe-pos&demo-description=%E5%96%B6%E6%A5%AD%E7%94%A8%20POS%20MVP)
+
+## スマホ開発（ローカル）
 
 ```bash
-npm run preview:public   # DB込み本番ビルド + トンネル
+npm run dev:mobile    # 同じ Wi‑Fi から接続（LAN URL 表示）
+npm run dev:tunnel    # HTTPS 公開 URL（LTE からも接続可）
+```
+
+スマホで開く: `/waiter/open` → 接続確認 → テーブル一覧
+
+## 常時プレビュー（開発用）
+
+```bash
+npm run preview:public   # 本番ビルド + 公開 URL
 npm run preview:mobile   # スマホ向け（Pinggy・パスワードなし）
+npm run preview:tunnel   # トンネル URL の再発行
 ```
 
-> `trycloudflare.com` / `loca.lt` は切れたり確認画面が出たりします。スマホでは `preview:mobile` を使ってください。
-
-### ワンコマンドで公開プレビュー
-
-Vercel アカウント不要。DB 込みで本番ビルドを起動し、スマホから開ける公開 URL を自動発行します。
-
-```bash
-npm install
-npm run preview:public
-```
-
-完了すると `PREVIEW_URL.json` に URL が書き出されます。
+> トンネル URL は一時的です。`npm run dev:tunnel` で毎回新しい URL が発行されます。
 
 ### 方法A: Vercel（固定URL・本番向け）
 
@@ -75,7 +72,8 @@ npm run preview:public
 ```bash
 npm install
 cp .env.example .env
-# .env の DATABASE_URL を設定（Neon または docker-compose の PostgreSQL）
+# 店舗 Mac: DATABASE_URL="file:./prisma/dev.db"（デフォルト）
+# クラウド: Neon の PostgreSQL 接続文字列に差し替え
 npm run db:push
 npm run dev
 ```
@@ -94,6 +92,16 @@ npm run dev
 詳細は [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) を参照（iPhone Cursor 共有用）。
 
 スマホからローカル開発サーバーを見る場合は `localhost` ではなく、PC の LAN IP を使います（例: `http://192.168.1.10:3000/waiter/tables`）。PC とスマホは同じ Wi‑Fi に接続してください。
+
+### iPhone接続（推奨）
+
+```bash
+npm run dev:mobile
+```
+
+ターミナルに表示されるURLを iPhone の Safari で開き、**共有 → ホーム画面に追加** でアプリ化できます。
+
+接続ガイド（QRコード）: `/waiter/connect` または 設定 → iPhone接続
 
 ## CSVインポート
 
@@ -138,6 +146,27 @@ npx tsx scripts/import-csv.ts "商品.csv" "取引.csv"
 | `/waiter` | ウェイターTOP |
 | `/waiter/tables` | テーブル一覧（人数選択） |
 | `/kitchen` | キッチン画面 |
+
+## QRオーダー
+
+1. 管理画面 → **QRオーダー** でテーブル別QRコードを印刷し、各テーブルに設置
+2. お客様が店内Wi‑Fiに接続した状態でスマホで読み取ると注文ページが開きます
+3. 注文はキッチンモニターとTM-m30伝票に自動連携されます
+
+## レシートプリンター（Epson TM-m30）
+
+1. TM-m30 を店内LAN（同じWi‑Fi）に接続
+2. ウェイター → 設定 → **プリンター設定** でIPアドレスを入力
+   - IPはプリンターのステータスシート（電源投入時に紙送りボタン長押し）で確認
+3. **テスト印刷** で接続確認
+
+| タイミング | 印刷内容 |
+|-----------|---------|
+| 注文送信 | キッチン伝票（テーブル・商品・メモ） |
+| 「印刷」ボタン | お会計伝票（明細・合計） |
+| 会計完了 | レシート（支払い方法・お釣り）＋現金時ドロワー |
+
+各自動印刷は設定画面でON/OFFできます。プリンター未設定・障害時も注文と会計は通常どおり動作します。
 
 ## 営業設定
 

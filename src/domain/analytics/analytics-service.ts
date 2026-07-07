@@ -1,23 +1,20 @@
 import { DataSource, PaymentMethodType } from "@prisma/client";
 import {
   countBusinessDays,
-  dateKey,
   formatJST,
   getDayOfWeekJST,
-  getYoYSameWeekdayDate,
   isRegularClosedDay,
 } from "@/lib/datetime";
+import {
+  getCurrentJstYearMonth,
+  isDateInJstMonth,
+  jstMonthRange,
+  prevJstMonth,
+} from "@/lib/analytics-period";
 import { calcPercentChange } from "@/lib/money";
 import { getDefaultStore, prisma } from "@/lib/prisma";
-import {
-  loadDailySalesFromTransactions,
-  loadHourlySalesFromTransactions,
-  type DailySalesRow,
-} from "@/lib/sales-query";
-import { buildSalesTransactionWhere, hasImportedSmaregiData } from "@/lib/sales-data-mode";
+import { buildSalesTransactionWhere } from "@/lib/sales-data-mode";
 import { getClosedDays } from "@/lib/store-config";
-import { STORE_LOCATION } from "@/lib/store-location";
-import { getWeatherForDates } from "@/domain/weather/weather-service";
 
 export type AnalyticsFilter = {
   startDate?: string;
@@ -33,16 +30,45 @@ function resolveDataSources(filter: AnalyticsFilter): DataSource[] {
   return filter.dataSource ? [filter.dataSource] : [DataSource.SMAREGI, DataSource.OWN_POS];
 }
 
-type DailySummaryRow = DailySalesRow;
+type DailySummaryRow = Awaited<
+  ReturnType<typeof prisma.salesDailySummary.findMany>
+>[number];
 
-function salesByDateMap(summaries: DailySummaryRow[]) {
-  return new Map(summaries.map((s) => [dateKey(s.businessDate), s]));
+function mergeDailySummaries(rows: DailySummaryRow[]) {
+  const map = new Map<string, DailySummaryRow>();
+
+  for (const row of rows) {
+    const key = row.businessDate.toISOString().slice(0, 10);
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...row });
+      continue;
+    }
+
+    existing.grossSales += row.grossSales;
+    existing.netSales += row.netSales;
+    existing.customerCount += row.customerCount;
+    existing.orderCount += row.orderCount;
+    existing.itemCount += row.itemCount;
+    existing.dineInSales += row.dineInSales;
+    existing.takeoutSales += row.takeoutSales;
+    existing.avgSpend =
+      existing.customerCount > 0 ? Math.round(existing.netSales / existing.customerCount) : 0;
+  }
+
+  return Array.from(map.values()).sort(
+    (a, b) => a.businessDate.getTime() - b.businessDate.getTime(),
+  );
 }
 
 async function resolveFilter(filter: AnalyticsFilter) {
   const store = await getDefaultStore();
-  const dataSources = resolveDataSources(filter);
-  const summaries = await loadDailySalesFromTransactions(store.id, dataSources);
+  const summaries = mergeDailySummaries(
+    await prisma.salesDailySummary.findMany({
+      where: { storeId: store.id, dataSource: { in: resolveDataSources(filter) } },
+      orderBy: { businessDate: "asc" },
+    }),
+  );
 
   const startDate = filter.startDate
     ? new Date(filter.startDate)
@@ -51,7 +77,7 @@ async function resolveFilter(filter: AnalyticsFilter) {
     ? new Date(filter.endDate)
     : summaries[summaries.length - 1]?.businessDate ?? new Date();
 
-  return { store, startDate, endDate, summaries, dataSources };
+  return { store, startDate, endDate, summaries };
 }
 
 function inRange(date: Date, start: Date, end: Date): boolean {
@@ -59,12 +85,11 @@ function inRange(date: Date, start: Date, end: Date): boolean {
 }
 
 export async function getAnalyticsSummary(filter: AnalyticsFilter = {}) {
-  const { store, startDate, endDate, summaries, dataSources } = await resolveFilter(filter);
+  const { store, startDate, endDate, summaries } = await resolveFilter(filter);
   const businessHoursOnly = filter.businessHoursOnly ?? false;
   const businessDaysOnly = filter.businessDaysOnly ?? true;
 
   const closedDays = getClosedDays(store.regularClosedDays);
-  const byDate = salesByDateMap(summaries);
 
   const filtered = summaries.filter((s) => {
     if (!inRange(s.businessDate, startDate, endDate)) return false;
@@ -78,33 +103,31 @@ export async function getAnalyticsSummary(filter: AnalyticsFilter = {}) {
   const totalCustomers = filtered.reduce((sum, s) => sum + s.customerCount, 0);
   const totalOrders = filtered.reduce((sum, s) => sum + s.orderCount, 0);
 
-  const today = filtered[filtered.length - 1];
-  const yoyRefDate = today ? getYoYSameWeekdayDate(today.businessDate) : null;
-  const yoyRefDay = yoyRefDate ? byDate.get(dateKey(yoyRefDate)) : undefined;
+  const latest = filtered[filtered.length - 1];
+  const dayBeforeLatest = filtered[filtered.length - 2];
+  const lastWeekSameDay = filtered.length >= 8 ? filtered[filtered.length - 8] : null;
 
-  const thisMonth = filtered.filter(
-    (s) =>
-      s.businessDate.getUTCMonth() === endDate.getUTCMonth() &&
-      s.businessDate.getUTCFullYear() === endDate.getUTCFullYear(),
-  );
-  const lastYearSameMonth = summaries.filter((s) => {
+  const { year: curYear, month: curMonth } = getCurrentJstYearMonth();
+  const prev = prevJstMonth(curYear, curMonth);
+
+  const thisMonth = filtered.filter((s) => isDateInJstMonth(s.businessDate, curYear, curMonth));
+  const lastMonth = summaries.filter((s) => {
     if (businessDaysOnly && isRegularClosedDay(s.businessDate, closedDays)) return false;
-    return (
-      s.businessDate.getUTCMonth() === endDate.getUTCMonth() &&
-      s.businessDate.getUTCFullYear() === endDate.getUTCFullYear() - 1
-    );
+    return isDateInJstMonth(s.businessDate, prev.year, prev.month);
   });
 
   const monthSales = thisMonth.reduce((sum, s) => sum + s.netSales, 0);
-  const prevYearMonthSales = lastYearSameMonth.reduce((sum, s) => sum + s.netSales, 0);
+  const prevMonthSales = lastMonth.reduce((sum, s) => sum + s.netSales, 0);
 
-  const salesWhere = await buildSalesTransactionWhere(store.id, dataSources);
+  const curMonthRange = jstMonthRange(curYear, curMonth);
+
   const payments = await prisma.salesTransactionPayment.groupBy({
     by: ["method"],
     where: {
       salesTransaction: {
-        ...salesWhere,
+        storeId: store.id,
         businessDate: { gte: startDate, lte: endDate },
+        dataSource: filter.dataSource ? filter.dataSource : { in: resolveDataSources(filter) },
       },
     },
     _sum: { amount: true },
@@ -116,33 +139,46 @@ export async function getAnalyticsSummary(filter: AnalyticsFilter = {}) {
       openTime: store.openTime,
       closeTime: store.closeTime,
       regularClosedDays: closedDays,
-      location: STORE_LOCATION.name,
     },
     period: { start: startDate, end: endDate },
-    today: today
+    latestBusinessDay: latest
       ? {
-          date: dateKey(today.businessDate),
-          dayOfWeek: DOW_LABELS[getDayOfWeekJST(today.businessDate)]!,
-          sales: today.netSales,
-          customers: today.customerCount,
-          orders: today.orderCount,
-          avgSpend: today.avgSpend,
-          yoyDate: yoyRefDate ? dateKey(yoyRefDate) : null,
-          yoySales: yoyRefDay?.netSales ?? null,
-          vsYoYSameWeekday: yoyRefDay
-            ? calcPercentChange(today.netSales, yoyRefDay.netSales)
+          date: formatJST(latest.businessDate, "yyyy-MM-dd"),
+          sales: latest.netSales,
+          customers: latest.customerCount,
+          orders: latest.orderCount,
+          avgSpend: latest.avgSpend,
+          vsPreviousDay: dayBeforeLatest
+            ? calcPercentChange(latest.netSales, dayBeforeLatest.netSales)
+            : null,
+          vsLastWeek: lastWeekSameDay
+            ? calcPercentChange(latest.netSales, lastWeekSameDay.netSales)
+            : null,
+        }
+      : null,
+    /** @deprecated latestBusinessDay を使用 */
+    today: latest
+      ? {
+          sales: latest.netSales,
+          customers: latest.customerCount,
+          orders: latest.orderCount,
+          avgSpend: latest.avgSpend,
+          vsYesterday: dayBeforeLatest
+            ? calcPercentChange(latest.netSales, dayBeforeLatest.netSales)
+            : null,
+          vsLastWeek: lastWeekSameDay
+            ? calcPercentChange(latest.netSales, lastWeekSameDay.netSales)
             : null,
         }
       : null,
     month: {
+      year: curYear,
+      month: curMonth,
+      label: curMonthRange.label,
       sales: monthSales,
-      vsPrevYearSameMonth: calcPercentChange(monthSales, prevYearMonthSales),
-      prevYearSales: prevYearMonthSales,
-      businessDays: countBusinessDays(
-        new Date(endDate.getUTCFullYear(), endDate.getUTCMonth(), 1),
-        endDate,
-        closedDays,
-      ),
+      vsPrevMonth: calcPercentChange(monthSales, prevMonthSales),
+      businessDays: countBusinessDays(curMonthRange.start, curMonthRange.end, closedDays),
+      hasData: thisMonth.length > 0,
     },
     totals: {
       sales: totalSales,
@@ -163,7 +199,6 @@ export async function getDailySales(filter: AnalyticsFilter = {}) {
   const { store, startDate, endDate, summaries } = await resolveFilter(filter);
   const businessDaysOnly = filter.businessDaysOnly ?? true;
   const closedDays = getClosedDays(store.regularClosedDays);
-  const byDate = salesByDateMap(summaries);
 
   return summaries
     .filter((s) => {
@@ -173,64 +208,66 @@ export async function getDailySales(filter: AnalyticsFilter = {}) {
       }
       return true;
     })
-    .map((s) => {
-      const yoyDate = getYoYSameWeekdayDate(s.businessDate);
-      const yoyRow = byDate.get(dateKey(yoyDate));
-      return {
-        date: formatJST(s.businessDate, "yyyy-MM-dd"),
-        dayOfWeek: DOW_LABELS[getDayOfWeekJST(s.businessDate)]!,
-        sales: s.netSales,
-        customers: s.customerCount,
-        orders: s.orderCount,
-        avgSpend: s.avgSpend,
-        isClosedDay: isRegularClosedDay(s.businessDate, closedDays),
-        yoyDate: dateKey(yoyDate),
-        yoySales: yoyRow?.netSales ?? null,
-        vsYoYSameWeekday: yoyRow ? calcPercentChange(s.netSales, yoyRow.netSales) : null,
-      };
-    });
-}
-
-export async function getDashboardData(filter: AnalyticsFilter = {}) {
-  const store = await getDefaultStore();
-  const [summary, daily, hourly, products, isPreviewData] = await Promise.all([
-    getAnalyticsSummary(filter),
-    getDailySales(filter),
-    getHourlySales({ ...filter, businessHoursOnly: true }),
-    getProductSales(filter, 10),
-    hasImportedSmaregiData(store.id).then((imported) => !imported),
-  ]);
-
-  const recent = daily.slice(-21);
-  const weatherDates = [
-    ...recent.map((d) => d.date),
-    ...recent.map((d) => d.yoyDate),
-  ];
-  const weather = await getWeatherForDates(store.id, weatherDates);
-
-  return {
-    summary,
-    daily: recent,
-    hourly: hourly.filter((h) => h.sales > 0),
-    products,
-    weather: Object.fromEntries(weather),
-    isPreviewData,
-  };
+    .map((s) => ({
+      date: formatJST(s.businessDate, "yyyy-MM-dd"),
+      dayOfWeek: DOW_LABELS[getDayOfWeekJST(s.businessDate)]!,
+      sales: s.netSales,
+      customers: s.customerCount,
+      orders: s.orderCount,
+      avgSpend: s.avgSpend,
+      isClosedDay: isRegularClosedDay(s.businessDate, closedDays),
+    }));
 }
 
 export async function getHourlySales(filter: AnalyticsFilter = {}) {
-  const { store, startDate, endDate, dataSources } = await resolveFilter(filter);
+  const { store, startDate, endDate } = await resolveFilter(filter);
   const businessHoursOnly = filter.businessHoursOnly ?? true;
 
-  return loadHourlySalesFromTransactions(
-    store.id,
-    dataSources,
-    startDate,
-    endDate,
-    store.openTime,
-    store.closeTime,
-    businessHoursOnly,
-  );
+  const hourly = await prisma.salesHourlySummary.findMany({
+    where: {
+      storeId: store.id,
+      businessDate: { gte: startDate, lte: endDate },
+      dataSource: filter.dataSource ? filter.dataSource : { in: resolveDataSources(filter) },
+    },
+  });
+
+  const hourMap = new Map<number, { sales: number; orders: number; customers: number }>();
+  for (let h = 0; h < 24; h++) {
+    hourMap.set(h, { sales: 0, orders: 0, customers: 0 });
+  }
+
+  for (const row of hourly) {
+    if (businessHoursOnly) {
+      const [openH] = store.openTime.split(":").map(Number);
+      const [closeH] = store.closeTime.split(":").map(Number);
+      if (row.hour < openH! || row.hour >= closeH!) continue;
+    }
+    const current = hourMap.get(row.hour)!;
+    current.sales += row.netSales;
+    current.orders += row.orderCount;
+    current.customers += row.customerCount;
+  }
+
+  const [openHour] = store.openTime.split(":").map(Number);
+  const [closeHour] = store.closeTime.split(":").map(Number);
+
+  return Array.from(hourMap.entries())
+    .filter(([hour]) => !businessHoursOnly || (hour >= (openHour ?? 0) && hour < (closeHour ?? 24)))
+    .map(([hour, data]) => ({
+      hour,
+      label: `${hour}:00`,
+      ...data,
+      band:
+        hour < 12
+          ? "オープン"
+          : hour < 14
+            ? "ランチ"
+            : hour < 16
+              ? "カフェタイム"
+              : hour < 18
+                ? "クローズ前"
+                : "営業時間外",
+    }));
 }
 
 export async function getWeekdaySales(filter: AnalyticsFilter = {}) {
@@ -259,14 +296,14 @@ export async function getWeekdaySales(filter: AnalyticsFilter = {}) {
 }
 
 export async function getProductSales(filter: AnalyticsFilter = {}, limit = 20) {
-  const { store, startDate, endDate, dataSources } = await resolveFilter(filter);
-  const salesWhere = await buildSalesTransactionWhere(store.id, dataSources);
+  const { store, startDate, endDate } = await resolveFilter(filter);
 
   const items = await prisma.salesTransactionItem.findMany({
     where: {
       salesTransaction: {
-        ...salesWhere,
+        storeId: store.id,
         businessDate: { gte: startDate, lte: endDate },
+        dataSource: filter.dataSource ? filter.dataSource : { in: resolveDataSources(filter) },
       },
     },
   });
@@ -301,6 +338,7 @@ export async function getPaymentBreakdown(filter: AnalyticsFilter = {}) {
     CREDIT_CARD: "クレジット",
     TRANSIT_IC: "交通系IC",
     QR: "QR決済",
+    STORES: "STORES決済",
     OTHER: "その他",
   };
 
@@ -317,16 +355,18 @@ export async function getMonthlyReport(filter: AnalyticsFilter = {}) {
   const monthStart = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), 1));
   const monthEnd = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, 0));
 
-  const daily = await getDailySales({
+  const monthFilter = {
     ...filter,
     startDate: monthStart.toISOString().slice(0, 10),
     endDate: monthEnd.toISOString().slice(0, 10),
-  });
+  };
 
-  const products = await getProductSales(filter, 20);
-  const weekday = await getWeekdaySales(filter);
-  const hourly = await getHourlySales(filter);
-  const payments = await getPaymentBreakdown(filter);
+  const daily = await getDailySales(monthFilter);
+
+  const products = await getProductSales(monthFilter, 20);
+  const weekday = await getWeekdaySales(monthFilter);
+  const hourly = await getHourlySales(monthFilter);
+  const payments = await getPaymentBreakdown(monthFilter);
 
   const monthSales = daily.reduce((s, d) => s + d.sales, 0);
   const monthCustomers = daily.reduce((s, d) => s + d.customers, 0);
@@ -410,7 +450,10 @@ export async function getProfitLossReport(filter: AnalyticsFilter = {}) {
     where: {
       salesTransaction: {
         ...salesWhere,
-        businessDate: { gte: prevMonthStart, lte: new Date(Date.UTC(prevMonthStart.getUTCFullYear(), prevMonthStart.getUTCMonth() + 1, 0)) },
+        businessDate: {
+          gte: prevMonthStart,
+          lte: new Date(Date.UTC(prevMonthStart.getUTCFullYear(), prevMonthStart.getUTCMonth() + 1, 0)),
+        },
       },
     },
     include: { product: { select: { costAmount: true } } },

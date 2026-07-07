@@ -23,6 +23,7 @@ export default async function ProductSalesPage() {
       </section>
       <StatTable
         headers={["順位", "商品名", "カテゴリ", "数量", "売上", "構成比"]}
+        yenColumns={[4]}
         rows={products.map((p) => [
           p.rank,
           p.name,

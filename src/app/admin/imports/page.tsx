@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { FILE_TYPE_LABELS } from "@/lib/format";
 import { PageHeader } from "@/components/admin/ui";
 
@@ -30,6 +30,13 @@ type Job = {
   _count: { errors: number };
 };
 
+type JobError = {
+  id: string;
+  rowNumber: number;
+  errorCode: string;
+  errorMessage: string;
+};
+
 export default function ImportsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [fileType, setFileType] = useState("AUTO");
@@ -37,6 +44,19 @@ export default function ImportsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const [jobErrors, setJobErrors] = useState<JobError[]>([]);
+
+  async function toggleErrors(job: Job) {
+    if (expandedJobId === job.id) {
+      setExpandedJobId(null);
+      return;
+    }
+    const res = await fetch(`/api/imports/${job.id}`);
+    const data = await res.json();
+    setJobErrors(data.errors ?? []);
+    setExpandedJobId(job.id);
+  }
 
   async function loadJobs() {
     const res = await fetch("/api/imports");
@@ -190,15 +210,48 @@ export default function ImportsPage() {
               </thead>
               <tbody>
                 {jobs.map((job) => (
-                  <tr key={job.id} className="border-t border-stone-100">
-                    <td className="px-4 py-3">{new Date(job.createdAt).toLocaleString("ja-JP")}</td>
-                    <td className="px-4 py-3">{job.fileName}</td>
-                    <td className="px-4 py-3">{FILE_TYPE_LABELS[job.fileType] ?? job.fileType}</td>
-                    <td className="px-4 py-3">{job.status}</td>
-                    <td className="px-4 py-3">{job.successRows}</td>
-                    <td className="px-4 py-3">{job.skippedRows}</td>
-                    <td className="px-4 py-3">{job.failedRows}</td>
-                  </tr>
+                  <Fragment key={job.id}>
+                    <tr className="border-t border-stone-100">
+                      <td className="px-4 py-3">{new Date(job.createdAt).toLocaleString("ja-JP")}</td>
+                      <td className="px-4 py-3">{job.fileName}</td>
+                      <td className="px-4 py-3">{FILE_TYPE_LABELS[job.fileType] ?? job.fileType}</td>
+                      <td className="px-4 py-3">{job.status}</td>
+                      <td className="px-4 py-3">{job.successRows}</td>
+                      <td className="px-4 py-3">{job.skippedRows}</td>
+                      <td className="px-4 py-3">
+                        {job.failedRows > 0 || job._count.errors > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleErrors(job)}
+                            className="font-medium text-red-600 underline"
+                          >
+                            {job.failedRows}件 {expandedJobId === job.id ? "▲" : "▼"}
+                          </button>
+                        ) : (
+                          job.failedRows
+                        )}
+                      </td>
+                    </tr>
+                    {expandedJobId === job.id && (
+                      <tr className="border-t border-stone-100 bg-red-50">
+                        <td colSpan={7} className="px-4 py-3">
+                          {jobErrors.length === 0 ? (
+                            <p className="text-stone-500">エラー詳細はありません</p>
+                          ) : (
+                            <ul className="max-h-64 space-y-1 overflow-y-auto text-xs">
+                              {jobErrors.map((err) => (
+                                <li key={err.id}>
+                                  <span className="font-mono text-red-700">行{err.rowNumber}</span>{" "}
+                                  <span className="text-stone-500">[{err.errorCode}]</span>{" "}
+                                  {err.errorMessage}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

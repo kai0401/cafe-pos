@@ -1,6 +1,14 @@
+import { randomUUID } from "crypto";
 import { EatInType, OrderStatus, TableStatus } from "@prisma/client";
 import { categorySortOrder, resolveCategoryName, WAITER_CATEGORY_ORDER } from "./smaregi-categories";
 import { getDefaultStore, prisma } from "./prisma";
+
+const SETUP_CACHE_MS = 60 * 60 * 1000;
+let setupCache: { storeId: string; cachedAt: number } | null = null;
+
+export function invalidateWaiterSetupCache() {
+  setupCache = null;
+}
 
 const TABLES = [
   ...Array.from({ length: 9 }, (_, i) => ({
@@ -47,8 +55,10 @@ async function resetStaleOpenOrders(storeId: string) {
   }
 }
 
-export async function ensureWaiterSetup() {
+export async function ensureWaiterTables() {
   const store = await getDefaultStore();
+  const count = await prisma.table.count({ where: { storeId: store.id } });
+  if (count >= TABLES.length) return store;
 
   await resetStaleOpenOrders(store.id);
   for (const t of TABLES) {
@@ -63,6 +73,27 @@ export async function ensureWaiterSetup() {
         status: TableStatus.EMPTY,
       },
       update: { sortOrder: t.sortOrder },
+    });
+  }
+  return store;
+}
+
+export async function ensureWaiterSetup() {
+  const store = await ensureWaiterTables();
+  if (
+    setupCache?.storeId === store.id &&
+    Date.now() - setupCache.cachedAt < SETUP_CACHE_MS
+  ) {
+    return store;
+  }
+
+  const tablesWithoutToken = await prisma.table.findMany({
+    where: { storeId: store.id, qrToken: null },
+  });
+  for (const table of tablesWithoutToken) {
+    await prisma.table.update({
+      where: { id: table.id },
+      data: { qrToken: randomUUID().replace(/-/g, "").slice(0, 16) },
     });
   }
 
@@ -105,6 +136,7 @@ export async function ensureWaiterSetup() {
     data: { isActive: false },
   });
 
+  setupCache = { storeId: store.id, cachedAt: Date.now() };
   return store;
 }
 

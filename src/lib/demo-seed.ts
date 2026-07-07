@@ -12,6 +12,7 @@ import {
   type WaiterCategoryName,
 } from "@/lib/smaregi-categories";
 import { getBusinessDate, getDayOfWeekJST } from "@/lib/datetime";
+import { isCloudRuntime } from "@/lib/runtime-config";
 import { prisma } from "@/lib/prisma";
 
 type DemoProduct = {
@@ -65,6 +66,8 @@ export async function removeDemoMenu(storeId: string) {
 
 /** Preview fallback when Smaregi CSV is not available. */
 export async function ensureDemoData(storeId: string) {
+  if (isCloudRuntime()) return;
+
   const productCount = await prisma.product.count({ where: { storeId } });
   if (productCount > 0) {
     await seedDemoSales(storeId);
