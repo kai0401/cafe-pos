@@ -196,25 +196,30 @@ export async function getCategoryProducts(
   );
 }
 
-/** メニュー管理用: 本商品もトッピングもすべて返す */
+/** メニュー管理（売切・価格）用: 本商品のみ（トッピング・値引きSKUは出さない） */
 export async function getCategoryProductsAll(
   storeId: string,
   categoryId: string,
   eatInType: "DINE_IN" | "TAKEOUT",
 ) {
+  const category = await prisma.productCategory.findUniqueOrThrow({ where: { id: categoryId } });
   const products = await prisma.product.findMany({
     where: { storeId, categoryId, status: { not: ProductStatus.HIDDEN } },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
 
-  return products.map((p) => {
-    const mapped = mapProduct(p, eatInType);
-    return {
-      ...mapped,
-      isModifier: mapped.isTopping || isModifierProduct(mapped.name, mapped.price),
-      sendToKitchen: p.sendToKitchen,
-    };
-  });
+  return uniqueProductsByNamePrice(
+    products
+      .map((p) => {
+        const mapped = mapProduct(p, eatInType);
+        return {
+          ...mapped,
+          isModifier: mapped.isTopping || isModifierProduct(mapped.name, mapped.price),
+          sendToKitchen: p.sendToKitchen,
+        };
+      })
+      .filter((p) => isWaiterCard(p, category.name)),
+  );
 }
 
 /** サイドバー付きメニュー画面用: 全カテゴリ + 商品 + オプション有無を一括取得 */

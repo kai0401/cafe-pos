@@ -35,6 +35,7 @@ const PUBLIC_PREFIXES = [
   "/api/connect/qr",
   "/api/health",
   "/api/print-agent",
+  "/api/ops/heartbeat",
   "/api/auth",
   "/_next",
   "/icons",

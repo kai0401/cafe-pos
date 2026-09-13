@@ -271,6 +271,33 @@ async function checkHealth() {
   }
 }
 
+async function pushOpsHeartbeat() {
+  const cloudUrl = (process.env.OPS_CLOUD_URL || "").replace(/\/$/, "");
+  const key = process.env.OPS_HEARTBEAT_KEY || "";
+  if (!cloudUrl || !key || key.length < 8) return;
+  try {
+    const snapRes = await fetch(`http://127.0.0.1:${PORT}/api/ops/snapshot`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!snapRes.ok) return;
+    const snapshot = await snapRes.json();
+    const res = await fetch(`${cloudUrl}/api/ops/heartbeat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-ops-key": key,
+      },
+      body: JSON.stringify({ ...snapshot, source: "pi" }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      log(`⚠ 心拍送信失敗 HTTP ${res.status}`);
+    }
+  } catch (err) {
+    log(`⚠ 心拍送信エラー (${err?.message ?? err})`);
+  }
+}
+
 async function main() {
   if (!existsSync(path.join(root, ".next"))) {
     console.error("\n✗ .next がありません。先に npm run build を実行してください。\n");
@@ -299,10 +326,16 @@ async function main() {
   log(`   ハブ:        ${base}/`);
   log(`   ウェイター:  ${base}/waiter/tables`);
   log(`   キッチン:    ${base}/kitchen`);
+  log(`   モニター:    ${base}/monitor`);
   log(`   管理:        ${base}/admin/dashboard`);
   log(`   ヘルス:      ${HEALTH_INTERVAL_MS / 1000}秒ごと / ${HEALTH_FAIL_LIMIT}回連続失敗で再起動`);
+  if (process.env.OPS_CLOUD_URL && process.env.OPS_HEARTBEAT_KEY) {
+    log(`   遠隔心拍:    ${process.env.OPS_CLOUD_URL} へ60秒ごと`);
+  }
 
   setInterval(() => void checkHealth(), HEALTH_INTERVAL_MS);
+  setInterval(() => void pushOpsHeartbeat(), 60_000);
+  setTimeout(() => void pushOpsHeartbeat(), 8_000);
 }
 
 main().catch((err) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { formatOrderItemNote } from "@/lib/order-modifiers";
 import { kitchenFetch } from "@/lib/kitchen-api";
@@ -45,6 +45,28 @@ function playNewOrderChime() {
   }
 }
 
+/** 画面上の順番を固定。新規は末尾追加、消えたものだけ除去 */
+function mergeStableOrder(prevOrder: string[], next: Ticket[]): { order: string[]; tickets: Ticket[] } {
+  const byId = new Map(next.map((t) => [t.id, t]));
+  const nextIds = new Set(next.map((t) => t.id));
+  const kept = prevOrder.filter((id) => nextIds.has(id));
+  const known = new Set(kept);
+  const newcomers = next
+    .filter((t) => !known.has(t.id))
+    .sort((a, b) => {
+      const ta = new Date(a.queuedAt).getTime();
+      const tb = new Date(b.queuedAt).getTime();
+      if (ta !== tb) return ta - tb;
+      return a.id.localeCompare(b.id);
+    })
+    .map((t) => t.id);
+  const order = [...kept, ...newcomers];
+  return {
+    order,
+    tickets: order.map((id) => byId.get(id)!).filter(Boolean),
+  };
+}
+
 export default function KitchenPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [initialLoaded, setInitialLoaded] = useState(false);
@@ -53,6 +75,7 @@ export default function KitchenPage() {
   const [now, setNow] = useState(() => Date.now());
   const prevCount = useRef(0);
   const loadingRef = useRef(false);
+  const displayOrderRef = useRef<string[]>([]);
   const [busyTicketIds, setBusyTicketIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
@@ -68,7 +91,9 @@ export default function KitchenPage() {
         playNewOrderChime();
       }
       prevCount.current = data.length;
-      setTickets(data);
+      const merged = mergeStableOrder(displayOrderRef.current, data);
+      displayOrderRef.current = merged.order;
+      setTickets(merged.tickets);
     } catch {
       setConnectionError(true);
     } finally {
@@ -112,6 +137,15 @@ export default function KitchenPage() {
       });
       if (alreadyBusy) return;
 
+      // 完了→提供済みで消えるまで、見た目だけ先に更新（並びは変えない）
+      if (next === "DONE") {
+        setTickets((prev) => prev.map((t) => (t.id === ticket.id ? { ...t, status: "DONE" } : t)));
+      } else if (next === "SERVED") {
+        setTickets((prev) => prev.filter((t) => t.id !== ticket.id));
+        displayOrderRef.current = displayOrderRef.current.filter((id) => id !== ticket.id);
+        prevCount.current = Math.max(0, prevCount.current - 1);
+      }
+
       try {
         const res = await kitchenFetch("/api/kitchen/tickets", {
           method: "PATCH",
@@ -122,6 +156,7 @@ export default function KitchenPage() {
         await load();
       } catch {
         setConnectionError(true);
+        await load();
       } finally {
         setBusyTicketIds((prev) => {
           const nextSet = new Set(prev);
@@ -133,47 +168,40 @@ export default function KitchenPage() {
     [load],
   );
 
-  const openTickets = useMemo(
-    () =>
-      [...tickets].sort(
-        (a, b) => new Date(a.queuedAt).getTime() - new Date(b.queuedAt).getTime(),
-      ),
-    [tickets],
-  );
   const waitingCount = tickets.filter((t) => t.status === "NEW" || t.status === "COOKING").length;
   const readyCount = tickets.filter((t) => t.status === "DONE").length;
 
   return (
     <div className="min-h-screen bg-stone-950 pb-safe text-white">
-      <div className="kitchen-top-bar sticky top-0 z-20 flex items-center justify-between bg-[var(--pos-accent)] px-4 text-white">
+      <div className="kitchen-top-bar sticky top-0 z-20 flex items-center justify-between bg-[var(--pos-accent)] px-5 text-white">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-[22px] font-black">キッチン</h1>
-          <span className="rounded-full bg-white/20 px-2.5 py-1 text-[13px] font-bold">
+          <h1 className="text-[28px] font-black tracking-tight">キッチン</h1>
+          <span className="rounded-full bg-white/20 px-3 py-1.5 text-[16px] font-bold">
             未完了 {waitingCount}
           </span>
-          <span className="rounded-full bg-white/20 px-2.5 py-1 text-[13px] font-bold">
+          <span className="rounded-full bg-white/20 px-3 py-1.5 text-[16px] font-bold">
             提供待ち {readyCount}
           </span>
-          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] text-white/90">
-            提供目標 {KITCHEN_SERVE_TARGET_MINUTES}分
+          <span className="rounded-full bg-white/15 px-3 py-1.5 text-[14px] text-white/90">
+            目標 {KITCHEN_SERVE_TARGET_MINUTES}分
           </span>
         </div>
         <div className="flex shrink-0 gap-3">
           <button
             type="button"
             onClick={() => void load()}
-            className="kitchen-header-btn min-w-[44px] text-[15px] text-white"
+            className="kitchen-header-btn min-w-[48px] text-[17px] text-white"
           >
             ↻ 更新
           </button>
-          <Link href="/kitchen/connect" className="kitchen-header-btn text-[15px] text-white/90">
+          <Link href="/kitchen/connect" className="kitchen-header-btn text-[17px] text-white/90">
             接続
           </Link>
         </div>
       </div>
 
       {connectionError && (
-        <div className="mx-4 mt-3 rounded-xl bg-red-600 px-4 py-3 text-center font-bold">
+        <div className="mx-4 mt-3 rounded-xl bg-red-600 px-4 py-4 text-center text-[18px] font-bold">
           ⚠ サーバーに接続できません。新しい注文が表示されていない可能性があります
         </div>
       )}
@@ -181,14 +209,14 @@ export default function KitchenPage() {
       {!initialLoaded && tickets.length === 0 && (
         <div className="mt-32 flex flex-col items-center gap-4">
           <div className="h-9 w-9 animate-spin rounded-full border-2 border-stone-700 border-t-[var(--pos-accent)]" />
-          <p className="text-lg text-stone-500">キッチンに接続中…</p>
+          <p className="text-[20px] text-stone-500">キッチンに接続中…</p>
         </div>
       )}
 
       {initialLoaded && tickets.length === 0 && (
         <div className="mt-32 flex flex-col items-center gap-3 text-center">
-          <p className="text-2xl font-bold text-stone-500">注文待ちはありません</p>
-          <p className="text-[14px] text-stone-600">
+          <p className="text-[28px] font-bold text-stone-500">注文待ちはありません</p>
+          <p className="text-[16px] text-stone-600">
             新しい注文は自動で表示されます
             {lastUpdated &&
               ` · 最終更新 ${lastUpdated.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`}
@@ -196,9 +224,9 @@ export default function KitchenPage() {
         </div>
       )}
 
-      {openTickets.length > 0 && (
+      {tickets.length > 0 && (
         <div className="divide-y divide-stone-800">
-          {openTickets.map((ticket) => {
+          {tickets.map((ticket) => {
             const countdown = getServeCountdown(ticket.queuedAt, now);
             const note = formatOrderItemNote(ticket.orderItem.note);
             const ready = ticket.status === "DONE";
@@ -209,37 +237,37 @@ export default function KitchenPage() {
                 type="button"
                 disabled={busy}
                 onClick={() => void advanceStatus(ticket)}
-                className={`flex w-full items-stretch px-4 py-4 text-left disabled:opacity-50 ${
+                className={`flex w-full items-stretch px-5 py-5 text-left disabled:opacity-50 ${
                   ready ? "bg-emerald-950/40" : "bg-stone-950"
                 }`}
               >
-                <div className="w-[72px] shrink-0">
-                  <p className="text-[22px] font-black leading-none">{ticket.orderItem.order.table.name}</p>
-                  <p className="mt-1 text-[11px] tabular-nums text-stone-500">
+                <div className="w-[96px] shrink-0">
+                  <p className="text-[32px] font-black leading-none">{ticket.orderItem.order.table.name}</p>
+                  <p className="mt-2 text-[15px] tabular-nums text-stone-500">
                     {new Date(ticket.queuedAt).toLocaleTimeString("ja-JP", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
                   </p>
                 </div>
-                <div className="min-w-0 flex-1 px-3">
-                  <p className="text-[20px] font-bold leading-snug">
+                <div className="min-w-0 flex-1 px-4">
+                  <p className="text-[28px] font-bold leading-snug">
                     {ticket.orderItem.productName}
                     {ticket.orderItem.quantity > 1 && (
-                      <span className="ml-2 text-[18px] text-amber-400">×{ticket.orderItem.quantity}</span>
+                      <span className="ml-2 text-[26px] text-amber-400">×{ticket.orderItem.quantity}</span>
                     )}
                   </p>
-                  {note && <p className="mt-1 text-[14px] text-amber-300">{note}</p>}
+                  {note && <p className="mt-2 text-[20px] leading-snug text-amber-300">{note}</p>}
                 </div>
-                <div className="flex w-[108px] shrink-0 flex-col items-end justify-center gap-1">
+                <div className="flex w-[140px] shrink-0 flex-col items-end justify-center gap-2">
                   <span
-                    className={`rounded-full px-2.5 py-1 text-[13px] font-bold ${
+                    className={`rounded-full px-3 py-1.5 text-[16px] font-bold ${
                       ready ? "bg-emerald-500 text-stone-900" : "bg-red-500 text-white"
                     }`}
                   >
                     {ready ? "提供済みにする" : "完了にする"}
                   </span>
-                  <span className={`text-[12px] font-bold tabular-nums ${countdownBadgeClass(countdown.urgency)}`}>
+                  <span className={`text-[16px] font-bold tabular-nums ${countdownBadgeClass(countdown.urgency)}`}>
                     {countdown.label}
                   </span>
                 </div>

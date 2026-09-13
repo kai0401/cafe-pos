@@ -23,9 +23,9 @@ const NAV = [
 ] as const;
 
 const OPS = [
+  { href: "/monitor", label: "遠隔モニター" },
   { href: "/waiter/tables", label: "ウェイター" },
   { href: "/kitchen", label: "キッチンモニター" },
-  { href: "/waiter/connect", label: "接続ガイド" },
 ] as const;
 
 function isActive(pathname: string, href: string) {

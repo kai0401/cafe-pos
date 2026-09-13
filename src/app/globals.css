@@ -330,12 +330,12 @@ body {
 .kitchen-shell .kitchen-top-bar {
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
-  min-height: calc(2.75rem + env(safe-area-inset-top, 0px));
+  min-height: calc(3.5rem + env(safe-area-inset-top, 0px));
 }
 
 .kitchen-shell .kitchen-header-btn {
   display: inline-flex;
-  min-height: 2.75rem;
+  min-height: 3rem;
   align-items: center;
 }
 

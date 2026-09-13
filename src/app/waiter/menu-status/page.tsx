@@ -62,7 +62,7 @@ export default function WaiterMenuStatusPage() {
         setError(data.error ?? "メニューの読み込みに失敗しました");
         return;
       }
-      setProducts(Array.isArray(data) ? data : []);
+      setProducts(Array.isArray(data) ? data.filter((p: Product) => !p.isModifier) : []);
     } catch {
       setError("メニューの読み込みに失敗しました");
     } finally {

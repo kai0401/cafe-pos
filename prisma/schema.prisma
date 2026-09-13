@@ -733,3 +733,15 @@ model PrintJob {
   @@index([status, createdAt])
   @@map("print_jobs")
 }
+
+/** 遠隔モニター用: 店舗サーバーからの心拍（クラウド側で保持） */
+model OpsHeartbeat {
+  id         String   @id @default("shop")
+  source     String   @default("pi")
+  hostname   String?
+  lanIp      String?  @map("lan_ip")
+  payload    Json
+  receivedAt DateTime @default(now()) @map("received_at")
+
+  @@map("ops_heartbeats")
+}
