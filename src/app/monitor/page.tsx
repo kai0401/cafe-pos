@@ -4,6 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { POS_ACCENT } from "@/lib/pos-theme";
 
+type WeatherSnap = {
+  date: string;
+  locationName: string;
+  label: string;
+  tempMax: number | null;
+  tempMin: number | null;
+  precipitation: number;
+};
+
 type OpsSnapshot = {
   generatedAt: string;
   source: "live" | "heartbeat";
@@ -25,7 +34,32 @@ type OpsSnapshot = {
   } | null;
   floor: { occupiedTables: number; emptyTables: number; openOrders: number };
   kitchen: { waiting: number; ready: number; totalOpen: number };
-  printer: { supported: boolean; ip: string | null; reachable: boolean | null };
+  printer: {
+    supported: boolean;
+    ip: string | null;
+    reachable: boolean | null;
+    status: "ok" | "offline" | "unchecked" | "cloud";
+    detail: string;
+  };
+  weather: {
+    locationName: string;
+    today: WeatherSnap | null;
+    tomorrow: WeatherSnap | null;
+  };
+  outlook: {
+    todayDow: string;
+    tomorrowDow: string;
+    sameDateLastYear: { date: string; netSales: number | null };
+    sameWeekdayLastYear: { date: string; netSales: number | null };
+    ratioVsSameDate: number | null;
+    ratioVsSameWeekday: number | null;
+    projectedToday: number | null;
+    projectedTomorrow: number | null;
+    weekdayAvgToday: number | null;
+    weekdayAvgTomorrow: number | null;
+    sampleCountToday: number;
+    sampleCountTomorrow: number;
+  };
   heartbeat: {
     receivedAt: string | null;
     ageSeconds: number | null;
@@ -84,8 +118,38 @@ function Metric({ label, value, sub }: { label: string; value: string; sub?: str
   return (
     <div>
       <p className="text-[12px] text-stone-500">{label}</p>
-      <p className="mt-0.5 text-[28px] font-bold tabular-nums leading-none text-stone-900">{value}</p>
+      <p className="mt-0.5 text-[26px] font-bold tabular-nums leading-none text-stone-900">{value}</p>
       {sub && <p className="mt-1 text-[12px] text-stone-400">{sub}</p>}
+    </div>
+  );
+}
+
+function WeatherRow({ title, w, dow }: { title: string; w: WeatherSnap | null; dow: string }) {
+  if (!w) {
+    return (
+      <div>
+        <p className="text-[12px] text-stone-500">
+          {title}（{dow}）
+        </p>
+        <p className="mt-1 text-[15px] text-stone-400">取得中…</p>
+      </div>
+    );
+  }
+  const temp =
+    w.tempMax != null && w.tempMin != null
+      ? `${Math.round(w.tempMin)}〜${Math.round(w.tempMax)}℃`
+      : w.tempMax != null
+        ? `最高 ${Math.round(w.tempMax)}℃`
+        : "—";
+  return (
+    <div>
+      <p className="text-[12px] text-stone-500">
+        {title}（{dow}）· {w.date}
+      </p>
+      <p className="mt-1 text-[20px] font-bold text-stone-900">
+        {w.label} <span className="text-[16px] font-semibold text-stone-600">{temp}</span>
+      </p>
+      <p className="mt-0.5 text-[12px] text-stone-400">降水 {w.precipitation.toFixed(1)}mm</p>
     </div>
   );
 }
@@ -156,13 +220,9 @@ export default function MonitorPage() {
       </header>
 
       <main className="mx-auto max-w-5xl space-y-4 px-4 py-5">
-        {loading && !data && (
-          <p className="py-16 text-center text-stone-500">読み込み中…</p>
-        )}
+        {loading && !data && <p className="py-16 text-center text-stone-500">読み込み中…</p>}
         {error && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
-            {error}
-          </div>
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">{error}</div>
         )}
 
         {data && (
@@ -170,10 +230,6 @@ export default function MonitorPage() {
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill ok={shopOnline} label={shopOnline ? "店舗オンライン" : "店舗オフライン / 要確認"} />
               <StatusPill ok={data.db === "ok"} label={data.db === "ok" ? "DB OK" : "DB 異常"} />
-              <StatusPill
-                ok={data.setup.ready}
-                label={data.setup.ready ? "セットアップ済" : "セットアップ未完了"}
-              />
               <span className="text-[12px] text-stone-500">
                 {data.source === "heartbeat" ? "店舗心拍" : "ライブ"} · {data.mode}
                 {tick >= 0 && data.generatedAt
@@ -199,6 +255,66 @@ export default function MonitorPage() {
                 />
               </Card>
 
+              <Card title={`天気 · ${data.weather.locationName}`}>
+                <div className="space-y-4">
+                  <WeatherRow title="今日" w={data.weather.today} dow={data.outlook.todayDow} />
+                  <WeatherRow title="明日" w={data.weather.tomorrow} dow={data.outlook.tomorrowDow} />
+                </div>
+              </Card>
+
+              <Card title="前年比・見込み">
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Metric
+                      label="対 前年同日"
+                      value={
+                        data.outlook.ratioVsSameDate != null
+                          ? `${data.outlook.ratioVsSameDate}%`
+                          : "—"
+                      }
+                      sub={
+                        data.outlook.sameDateLastYear.netSales != null
+                          ? `${data.outlook.sameDateLastYear.date} ${yen(data.outlook.sameDateLastYear.netSales)}`
+                          : "前年データなし"
+                      }
+                    />
+                    <Metric
+                      label="対 前年同曜"
+                      value={
+                        data.outlook.ratioVsSameWeekday != null
+                          ? `${data.outlook.ratioVsSameWeekday}%`
+                          : "—"
+                      }
+                      sub={
+                        data.outlook.sameWeekdayLastYear.netSales != null
+                          ? `${data.outlook.sameWeekdayLastYear.date} ${yen(data.outlook.sameWeekdayLastYear.netSales)}`
+                          : "前年データなし"
+                      }
+                    />
+                  </div>
+                  <div className="border-t border-stone-100 pt-3 grid grid-cols-2 gap-3">
+                    <Metric
+                      label={`今日見込み（${data.outlook.todayDow}）`}
+                      value={
+                        data.outlook.projectedToday != null
+                          ? yen(data.outlook.projectedToday)
+                          : "—"
+                      }
+                      sub={`直近同曜平均 · ${data.outlook.sampleCountToday}日`}
+                    />
+                    <Metric
+                      label={`明日見込み（${data.outlook.tomorrowDow}）`}
+                      value={
+                        data.outlook.projectedTomorrow != null
+                          ? yen(data.outlook.projectedTomorrow)
+                          : "—"
+                      }
+                      sub={`直近同曜平均 · ${data.outlook.sampleCountTomorrow}日`}
+                    />
+                  </div>
+                </div>
+              </Card>
+
               <Card title="フロア" tone={data.floor.openOrders > 0 ? "warn" : "default"}>
                 <div className="grid grid-cols-2 gap-4">
                   <Metric label="使用中卓" value={String(data.floor.occupiedTables)} />
@@ -213,17 +329,15 @@ export default function MonitorPage() {
                 </div>
               </Card>
 
-              <Card title="プリンター">
-                <p className="text-[16px] font-semibold">
-                  {!data.printer.supported
-                    ? "クラウド（直接印刷なし）"
-                    : data.printer.reachable == null
-                      ? data.printer.ip
-                        ? `${data.printer.ip}（未確認）`
-                        : "未設定"
-                      : data.printer.reachable
-                        ? `${data.printer.ip} · 到達OK`
-                        : `${data.printer.ip} · 到達不可`}
+              <Card
+                title="プリンター"
+                tone={data.printer.status === "offline" ? "warn" : data.printer.status === "ok" ? "ok" : "default"}
+              >
+                <p className="text-[15px] font-semibold leading-relaxed text-stone-800">
+                  {data.printer.detail}
+                </p>
+                <p className="mt-2 text-[12px] text-stone-400">
+                  店内LAN・電源ONのときのみ到達確認できます（心拍とは別）
                 </p>
               </Card>
 
@@ -237,19 +351,19 @@ export default function MonitorPage() {
               </Card>
 
               <Card
-                title="心拍"
+                title="店舗心拍"
                 tone={data.heartbeat?.stale ? "warn" : data.heartbeat ? "ok" : "default"}
               >
                 <p className="text-[15px] text-stone-700">
                   {data.heartbeat?.receivedAt
                     ? `${ageLabel(data.heartbeat.ageSeconds)}（${data.heartbeat.source ?? "shop"}）`
-                    : "未受信（店内モニターまたは心拍設定が必要）"}
+                    : "未受信"}
                 </p>
               </Card>
             </div>
 
             <p className="pb-8 text-center text-[12px] text-stone-400">
-              15秒ごとに自動更新 · クラウドでは店舗からの心拍を優先表示
+              15秒ごとに自動更新 · 天気は日暮里駅周辺 · 見込みは直近同曜日の平均
             </p>
           </>
         )}

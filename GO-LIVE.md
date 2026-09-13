@@ -17,6 +17,7 @@
 | 管理 | `http://PI_IP:3000/admin/dashboard` |
 | プリンター設定 | `http://PI_IP:3000/admin/printer` |
 | QR再発行 | `http://PI_IP:3000/admin/qr` |
+| 遠隔モニター | `http://PI_IP:3000/monitor`（外からは `https://azumaya-pos.vercel.app/monitor`） |
 
 プリンター想定IP: `192.168.1.230:9100`（店の実機に合わせて `admin/printer` で確認）
 
