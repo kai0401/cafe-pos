@@ -31,7 +31,7 @@ function ToggleRow({
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`relative h-8 w-14 shrink-0 rounded-full transition ${
-          checked ? "bg-[#e8912d]" : "bg-stone-300"
+          checked ? "bg-[var(--pos-accent)]" : "bg-stone-300"
         }`}
       >
         <span
@@ -63,7 +63,7 @@ export default function WaiterOrderSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#efefef]">
+    <div className="min-h-screen bg-[var(--pos-bg)]">
       <WaiterHeader title="注文設定" backHref="/waiter/settings" />
       <div className="bg-white">
         <ToggleRow

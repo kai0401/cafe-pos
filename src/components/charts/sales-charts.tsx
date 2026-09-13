@@ -15,9 +15,20 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatYen } from "@/lib/format";
+import {
+  AdminChartTooltip,
+  CHART_ACCENT,
+  CHART_GRID,
+  CHART_MUTED,
+  CHART_SAGE,
+  CHART_SERIES,
+  CHART_TICK,
+  CHART_VERMILLION,
+} from "@/components/admin/chart-theme";
 
-const COLORS = ["#b45309", "#d97706", "#f59e0b", "#78716c", "#a8a29e"];
+function toMan(v: number | string) {
+  return `${(Number(v) / 10000).toFixed(0)}万`;
+}
 
 export function SalesLineChart({
   data,
@@ -27,11 +38,11 @@ export function SalesLineChart({
   return (
     <ResponsiveContainer width="100%" height={300}>
       <LineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
-        <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
-        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} />
-        <Tooltip formatter={(v) => formatYen(Number(v))} />
-        <Line type="monotone" dataKey="sales" stroke="#b45309" strokeWidth={2} dot={false} />
+        <CartesianGrid strokeDasharray="4 4" stroke={CHART_GRID} vertical={false} />
+        <XAxis dataKey="date" tick={CHART_TICK} tickFormatter={(v) => v.slice(5)} tickLine={false} axisLine={{ stroke: CHART_GRID }} />
+        <YAxis tick={CHART_TICK} tickFormatter={toMan} tickLine={false} axisLine={false} width={44} />
+        <Tooltip content={<AdminChartTooltip />} />
+        <Line type="monotone" dataKey="sales" stroke={CHART_ACCENT} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#fffcf8", stroke: CHART_ACCENT, strokeWidth: 2 }} />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -45,11 +56,11 @@ export function HourlyBarChart({
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
-        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} />
-        <Tooltip formatter={(v, _n, p) => [formatYen(Number(v)), (p.payload as { band?: string }).band ?? ""]} />
-        <Bar dataKey="sales" fill="#b45309" radius={[4, 4, 0, 0]} />
+        <CartesianGrid strokeDasharray="4 4" stroke={CHART_GRID} vertical={false} />
+        <XAxis dataKey="label" tick={CHART_TICK} tickLine={false} axisLine={{ stroke: CHART_GRID }} />
+        <YAxis tick={CHART_TICK} tickFormatter={toMan} tickLine={false} axisLine={false} width={44} />
+        <Tooltip content={<AdminChartTooltip />} cursor={{ fill: "rgba(154, 92, 56, 0.06)" }} />
+        <Bar dataKey="sales" fill={CHART_ACCENT} radius={[3, 3, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -62,12 +73,16 @@ export function ProductBarChart({
 }) {
   return (
     <ResponsiveContainer width="100%" height={400}>
-      <BarChart data={data} layout="vertical" margin={{ left: 80 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
-        <XAxis type="number" tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} />
-        <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
-        <Tooltip formatter={(v) => formatYen(Number(v))} />
-        <Bar dataKey="sales" fill="#92400e" radius={[0, 4, 4, 0]} />
+      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16 }}>
+        <CartesianGrid strokeDasharray="4 4" stroke={CHART_GRID} horizontal={false} />
+        <XAxis type="number" tick={CHART_TICK} tickFormatter={toMan} tickLine={false} axisLine={{ stroke: CHART_GRID }} />
+        <YAxis type="category" dataKey="name" tick={{ ...CHART_TICK, fontSize: 11 }} width={104} tickLine={false} axisLine={false} />
+        <Tooltip content={<AdminChartTooltip />} cursor={{ fill: "rgba(154, 92, 56, 0.06)" }} />
+        <Bar dataKey="sales" radius={[0, 3, 3, 0]} barSize={16}>
+          {data.map((_, i) => (
+            <Cell key={i} fill={i % 2 === 0 ? CHART_ACCENT : CHART_SAGE} />
+          ))}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );
@@ -81,12 +96,12 @@ export function PaymentPieChart({
   return (
     <ResponsiveContainer width="100%" height={260}>
       <PieChart>
-        <Pie data={data} dataKey="amount" nameKey="label" cx="50%" cy="50%" outerRadius={90} label>
+        <Pie data={data} dataKey="amount" nameKey="label" cx="50%" cy="50%" outerRadius={90} label={({ name }) => name}>
           {data.map((_, i) => (
-            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+            <Cell key={i} fill={CHART_SERIES[i % CHART_SERIES.length]} />
           ))}
         </Pie>
-        <Tooltip formatter={(v) => formatYen(Number(v))} />
+        <Tooltip content={<AdminChartTooltip />} />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -100,15 +115,17 @@ export function WeekdayBarChart({
   return (
     <ResponsiveContainer width="100%" height={260}>
       <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
-        <XAxis dataKey="label" />
-        <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} />
-        <Tooltip formatter={(v) => formatYen(Number(v))} />
-        <Bar dataKey="sales" fill="#78716c" radius={[4, 4, 0, 0]} />
+        <CartesianGrid strokeDasharray="4 4" stroke={CHART_GRID} vertical={false} />
+        <XAxis dataKey="label" tick={CHART_TICK} tickLine={false} axisLine={{ stroke: CHART_GRID }} />
+        <YAxis tick={CHART_TICK} tickFormatter={toMan} tickLine={false} axisLine={false} width={44} />
+        <Tooltip content={<AdminChartTooltip />} cursor={{ fill: "rgba(154, 92, 56, 0.06)" }} />
+        <Bar dataKey="sales" fill={CHART_SAGE} radius={[3, 3, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
 }
+
+const PL_NAME_MAP = { revenue: "売上", expenses: "経費", profit: "利益" };
 
 export function ProfitLossComboChart({
   data,
@@ -118,13 +135,13 @@ export function ProfitLossComboChart({
   return (
     <ResponsiveContainer width="100%" height={300}>
       <ComposedChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
-        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`} />
-        <Tooltip formatter={(v, name) => [formatYen(Number(v)), name === "revenue" ? "売上" : name === "expenses" ? "経費" : "利益"]} />
-        <Bar dataKey="revenue" name="revenue" fill="#b45309" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="expenses" name="expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
-        <Line type="monotone" dataKey="profit" name="profit" stroke="#059669" strokeWidth={2} dot={{ r: 4 }} />
+        <CartesianGrid strokeDasharray="4 4" stroke={CHART_GRID} vertical={false} />
+        <XAxis dataKey="label" tick={CHART_TICK} tickLine={false} axisLine={{ stroke: CHART_GRID }} />
+        <YAxis tick={CHART_TICK} tickFormatter={toMan} tickLine={false} axisLine={false} width={44} />
+        <Tooltip content={<AdminChartTooltip nameMap={PL_NAME_MAP} />} cursor={{ fill: "rgba(154, 92, 56, 0.06)" }} />
+        <Bar dataKey="revenue" name="revenue" fill={CHART_ACCENT} radius={[3, 3, 0, 0]} />
+        <Bar dataKey="expenses" name="expenses" fill={CHART_VERMILLION} radius={[3, 3, 0, 0]} />
+        <Line type="monotone" dataKey="profit" name="profit" stroke={CHART_SAGE} strokeWidth={2} dot={{ r: 3, fill: CHART_SAGE }} />
       </ComposedChart>
     </ResponsiveContainer>
   );
@@ -143,15 +160,18 @@ export function RatioGauge({
   const over = value > target;
   return (
     <div>
-      <div className="mb-1 flex justify-between text-sm">
-        <span className="font-medium text-stone-700">{label}</span>
-        <span className={over ? "font-bold text-red-600" : "font-bold text-emerald-700"}>
-          {value}% <span className="text-xs font-normal text-stone-400">目標 {target}%</span>
+      <div className="mb-1.5 flex justify-between text-sm">
+        <span className="font-medium text-[var(--admin-ink)]">{label}</span>
+        <span
+          className={`font-semibold tabular-nums ${over ? "text-[var(--admin-vermillion)]" : "text-[var(--admin-sage)]"}`}
+        >
+          {value}%{" "}
+          <span className="text-xs font-normal text-[var(--admin-muted)]">目標 {target}%</span>
         </span>
       </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-stone-100">
+      <div className="h-2 overflow-hidden rounded-full bg-[var(--admin-line)]/70">
         <div
-          className={`h-full rounded-full transition-all ${over ? "bg-red-500" : "bg-emerald-500"}`}
+          className={`h-full rounded-full transition-all ${over ? "bg-[var(--admin-vermillion)]" : "bg-[var(--admin-sage)]"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -174,12 +194,12 @@ export function EatInPieChart({
   return (
     <ResponsiveContainer width="100%" height={220}>
       <PieChart>
-        <Pie data={data} dataKey="amount" nameKey="label" cx="50%" cy="50%" outerRadius={80} label>
+        <Pie data={data} dataKey="amount" nameKey="label" cx="50%" cy="50%" outerRadius={80} label={({ name }) => name}>
           {data.map((_, i) => (
-            <Cell key={i} fill={i === 0 ? "#b45309" : "#78716c"} />
+            <Cell key={i} fill={i === 0 ? CHART_ACCENT : CHART_SAGE} />
           ))}
         </Pie>
-        <Tooltip formatter={(v) => formatYen(Number(v))} />
+        <Tooltip content={<AdminChartTooltip />} />
       </PieChart>
     </ResponsiveContainer>
   );

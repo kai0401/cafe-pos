@@ -2,18 +2,7 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { EXPENSE_CATEGORY_LABELS, formatYen } from "@/lib/format";
-
-const COLORS = [
-  "#b45309",
-  "#dc2626",
-  "#059669",
-  "#2563eb",
-  "#7c3aed",
-  "#db2777",
-  "#0891b2",
-  "#65a30d",
-  "#78716c",
-];
+import { AdminChartTooltip, CHART_SERIES } from "@/components/admin/chart-theme";
 
 export function ExpenseCategoryPieChart({
   data,
@@ -28,7 +17,7 @@ export function ExpenseCategoryPieChart({
 
   if (chartData.length === 0) {
     return (
-      <p className="py-16 text-center text-sm text-stone-400">
+      <p className="py-16 text-center text-sm text-[var(--admin-muted)]">
         経費データがありません
       </p>
     );
@@ -56,16 +45,13 @@ export function ExpenseCategoryPieChart({
               labelLine={false}
             >
               {chartData.map((_, i) => (
-                <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                <Cell key={i} fill={CHART_SERIES[i % CHART_SERIES.length]} />
               ))}
             </Pie>
-            <Tooltip
-              formatter={(v) => formatYen(Number(v))}
-              labelFormatter={(label) => label}
-            />
+            <Tooltip content={<AdminChartTooltip />} />
           </PieChart>
         </ResponsiveContainer>
-        <p className="text-center text-sm font-semibold text-stone-700">
+        <p className="text-center text-sm font-semibold text-[var(--admin-ink)]">
           合計 {formatYen(total)}
         </p>
       </div>
@@ -75,13 +61,13 @@ export function ExpenseCategoryPieChart({
           <li key={d.category} className="flex items-center gap-2 text-sm">
             <span
               className="h-3 w-3 shrink-0 rounded-full"
-              style={{ backgroundColor: COLORS[i % COLORS.length] }}
+              style={{ backgroundColor: CHART_SERIES[i % CHART_SERIES.length] }}
             />
-            <span className="min-w-0 flex-1 truncate text-stone-700">{d.name}</span>
-            <span className="shrink-0 font-semibold tabular-nums text-stone-900">
+            <span className="min-w-0 flex-1 truncate text-[var(--admin-ink)]">{d.name}</span>
+            <span className="shrink-0 font-semibold tabular-nums text-[var(--admin-ink)]">
               {formatYen(d.value)}
             </span>
-            <span className="shrink-0 text-xs text-stone-400 w-10 text-right">
+            <span className="w-10 shrink-0 text-right text-xs text-[var(--admin-muted)]">
               {total > 0 ? `${Math.round((d.value / total) * 100)}%` : ""}
             </span>
           </li>

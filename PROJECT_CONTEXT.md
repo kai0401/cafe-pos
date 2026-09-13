@@ -12,13 +12,14 @@
 ## プロジェクト概要
 
 日本の喫茶店1店舗専用 POS・注文・売上分析。スマレジから段階的に置き換え。
+**本番は Vercel + Neon（店舗 Mac 不要）。** iPhone / iPad / お客様スマホだけで運用。
 
 | Phase | 内容 | 状態 |
 |-------|------|------|
 | 1 | スマレジCSV取込 + 売上分析 | ✅ 完了 |
 | 2 | ウェイター + キッチン | ✅ 完了 |
 | 3 | 会計（支払い方法・お釣り） | ✅ 完了 |
-| 4 | TM-m30 プリンター（伝票・レシート・ドロワー） | ✅ 完了（LAN専用・クラウド不可） |
+| 4 | TM-m30 プリンター（伝票・レシート・ドロワー） | ✅ 完了（LAN専用・クラウドではキッチン画面+STORES） |
 | 5 | QRオーダー | ✅ 完了 |
 | 6 | 自動精算機連携 | 未着手（ハードウェア依存） |
 | 7 | **店舗導入**（Vercel + Neon・Mac不要） | 🔄 進行中 → [ROLLOUT.md](./ROLLOUT.md) |
@@ -191,7 +192,7 @@ npm install && cp .env.example .env && npx prisma generate && npm run dev
 | STORES 端末 | 会計・レシート印刷 |
 | お客様スマホ | テーブル常設 QR |
 
-環境変数: `DATABASE_URL`（Neon）, `PUBLIC_BASE_URL`, `ADMIN_PIN`
+環境変数: `DATABASE_URL`（Neon）, `PUBLIC_BASE_URL`（ログイン機能は廃止済み）
 
 手順: **[ROLLOUT.md](./ROLLOUT.md)**
 

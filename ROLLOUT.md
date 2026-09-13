@@ -30,7 +30,7 @@ STORES端末 ──────────► 会計時にスタッフが操作
 |------|------|
 | TM-m30（LAN印刷） | クラウドからは不可。**キッチン画面**で代替。レシートは **STORES端末** |
 | レシート画像（経費） | PostgreSQL に保存（クラウド対応済み） |
-| 管理画面のセキュリティ | `ADMIN_PIN` でログイン必須 |
+| 管理画面のセキュリティ | ログイン廃止（店舗運用向け。URL を知っている人は操作可能） |
 | DBバックアップ | Neon の自動バックアップ + 週次 CSV エクスポート |
 | QRシール | `https://<your-app>.vercel.app/qr/...` を印刷して常設 |
 
@@ -53,14 +53,21 @@ STORES端末 ──────────► 会計時にスタッフが操作
 |------|-----|------|
 | `DATABASE_URL` | `postgresql://...` | Neon 接続 |
 | `PUBLIC_BASE_URL` | `https://cafe-pos.vercel.app` | QRシール・接続URL |
-| `ADMIN_PIN` | `1234`（本番は複雑に） | 管理画面ログイン |
 | `STORES_API_KEY` | （任意） | QRからのオンライン決済 |
 
-デプロイ後 `vercel-build` が自動でスキーマを PostgreSQL に反映します。
+デプロイ後 `vercel-build` がスキーマを反映します（`prisma/migrations` があれば `migrate deploy`、なければ互換のため `db push`）。
+
+デプロイ後の疎通確認:
+
+```bash
+SMOKE_BASE_URL=https://<your-app>.vercel.app npm run smoke:check
+```
+
+スキーマ運用: `prisma/migrations` があるため本番ビルドは `prisma migrate deploy` を使います。既存 Neon DB が `db push` で作られている場合は、初回だけ `prisma migrate resolve --applied 20260809000000_init` で履歴を揃えてください。
 
 ### 3. 初期データ
 
-1. `https://<your-app>.vercel.app/admin/login` で PIN ログイン
+1. `https://<your-app>.vercel.app/admin/dashboard` を開く（ログインなし）
 2. `/admin/imports` からスマレジ CSV をインポート
 3. `/admin/settings` で店舗名・STORES決済を有効化
 4. `/admin/qr` で QRシールを印刷 → 各テーブルに貼付
@@ -146,7 +153,7 @@ TM-m30 を使いたい場合は将来「印刷ブリッジ」端末が必要で�
 - [ ] 1週間、スマレジなしで営業完結
 - [ ] iPhone + キッチンiPad + STORES で全フロー安定
 - [ ] QRシールからお客様注文が動作
-- [ ] 管理画面 PIN ログイン設定済み
+- [ ] 管理画面にログインなしで入れる
 - [ ] 経費レシート撮影が1件以上成功
 
 ---
@@ -162,3 +169,26 @@ npm run dev
 ```
 
 詳細は [README.md](./README.md) / [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md)
+
+---
+
+## 障害時の切り分け（短）
+
+| 症状 | 確認 |
+|------|------|
+| `/api/health` が 503 | Neon `DATABASE_URL`・接続・`migrate deploy` 失敗ログ |
+| migrate エラー（既に表がある） | `npx prisma migrate resolve --applied 20260809000000_init` 後に再デプロイ |
+| 会計したが売上が無い | ほぼ解消済み（会計はトランザクション化）。残る場合は order `PAID` と `sales_transactions.external_id=pos-…` を突合 |
+| STORES が AWAITING_ONLINE のまま | API キー・`/api/payments/stores/:id` の sync・Coiney ダッシュボードの支払状態 |
+| 古い決済 URL で支払われた | 新規セッション作成時に旧 URL のリモートキャンセルを試行。支払済みなら sync で会計確定 |
+| オンライン決済待ちで取引中止できない | 仕様どおり。お客様にキャンセルしてもらうか支払完了後に処理 |
+| スタッフ API が 401 | ログインは廃止済み。デプロイが古い場合は最新を反映 |
+| QR で会計ボタンが出ない | キッチン完了（DONE）または提供済（SERVED）まで待つ。ドリンク等は送信時に自動提供済 |
+
+### 決済の役割分担
+
+| 経路 | 手段 |
+|------|------|
+| QR お客様セルフ払い（オンライン） | クレジットカード（Coiney） |
+| ホール会計（端末） | STORES 端末のカード / QR / 電子マネー |
+| 現金 | ウェイター会計画面 |

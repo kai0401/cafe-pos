@@ -1,10 +1,13 @@
 import {
+  DataSource,
   OrderChannel,
   PaymentMethodType,
   PaymentSessionStatus,
+  Prisma,
+  TransactionType,
 } from "@prisma/client";
 import { assertOrderReadyForCheckout, completeOrderCheckout } from "@/domain/order/order-service";
-import { generateOrderNumber } from "@/lib/waiter-setup";
+import { getBusinessDate } from "@/lib/datetime";
 import { prisma } from "@/lib/prisma";
 
 const COINEY_API = "https://api.coiney.io/api/v1";
@@ -27,6 +30,23 @@ type CreateSessionInput = {
   mode?: "terminal" | "online";
 };
 
+async function cancelRemoteStoresPayment(storesPaymentId: string) {
+  const apiKey = process.env.STORES_API_KEY?.trim();
+  if (!apiKey) return;
+  try {
+    await fetch(`${COINEY_API}/payments/${storesPaymentId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "X-CoineyPayge-Version": "2016-10-25",
+        Accept: "application/json",
+      },
+    });
+  } catch (err) {
+    console.warn("[stores] remote cancel failed:", storesPaymentId, err);
+  }
+}
+
 export async function createStoresPaymentSession(input: CreateSessionInput) {
   const { orderId, storeId, amount, discountAmount = 0, baseUrl, mode } = input;
 
@@ -41,10 +61,35 @@ export async function createStoresPaymentSession(input: CreateSessionInput) {
 
   await assertOrderReadyForCheckout(orderId);
 
+  const prior = await prisma.paymentSession.findMany({
+    where: {
+      orderId,
+      status: {
+        in: [
+          PaymentSessionStatus.PENDING,
+          PaymentSessionStatus.AWAITING_TERMINAL,
+          PaymentSessionStatus.AWAITING_ONLINE,
+        ],
+      },
+    },
+  });
+
+  for (const old of prior) {
+    if (old.storesPaymentId) {
+      void cancelRemoteStoresPayment(old.storesPaymentId);
+    }
+  }
+
   await prisma.paymentSession.updateMany({
     where: {
       orderId,
-      status: { in: ["PENDING", "AWAITING_TERMINAL", "AWAITING_ONLINE"] },
+      status: {
+        in: [
+          PaymentSessionStatus.PENDING,
+          PaymentSessionStatus.AWAITING_TERMINAL,
+          PaymentSessionStatus.AWAITING_ONLINE,
+        ],
+      },
     },
     data: { status: PaymentSessionStatus.CANCELLED },
   });
@@ -66,21 +111,29 @@ export async function createStoresPaymentSession(input: CreateSessionInput) {
   });
 
   if (useOnline) {
-    const online = await createStoresOnlinePayment({
-      sessionId: session.id,
-      amount,
-      tableName: order.table.name,
-      orderNumber: order.orderNumber,
-      baseUrl,
-    });
-    return prisma.paymentSession.update({
-      where: { id: session.id },
-      data: {
-        status: PaymentSessionStatus.AWAITING_ONLINE,
-        storesPaymentId: online.storesPaymentId,
-        paymentUrl: online.paymentUrl,
-      },
-    });
+    try {
+      const online = await createStoresOnlinePayment({
+        sessionId: session.id,
+        amount,
+        tableName: order.table.name,
+        orderNumber: order.orderNumber,
+        baseUrl,
+      });
+      return prisma.paymentSession.update({
+        where: { id: session.id },
+        data: {
+          status: PaymentSessionStatus.AWAITING_ONLINE,
+          storesPaymentId: online.storesPaymentId,
+          paymentUrl: online.paymentUrl,
+        },
+      });
+    } catch (err) {
+      await prisma.paymentSession.update({
+        where: { id: session.id },
+        data: { status: PaymentSessionStatus.FAILED },
+      });
+      throw err;
+    }
   }
 
   return session;
@@ -113,7 +166,7 @@ async function createStoresOnlinePayment(params: {
       locale: "ja_JP",
       redirectUrl,
       cancelUrl,
-      method: "creditcard",
+      method: "creditcard", // オンライン請求はカード。QR/電子マネーは STORES 端末で会計
       subject: `テーブル ${params.tableName} お会計`,
       description: `order:${params.orderNumber};session:${params.sessionId}`,
     }),
@@ -142,6 +195,10 @@ export async function syncStoresOnlinePayment(sessionId: string) {
     where: { id: sessionId },
   });
 
+  if (session.status === PaymentSessionStatus.PAID) {
+    return session;
+  }
+
   if (!session.storesPaymentId || !isStoresApiConfigured()) {
     return session;
   }
@@ -155,7 +212,9 @@ export async function syncStoresOnlinePayment(sessionId: string) {
     },
   });
 
-  if (!res.ok) return session;
+  if (!res.ok) {
+    throw new Error(`STORES決済の確認に失敗しました (${res.status})`);
+  }
 
   const data = (await res.json()) as { status?: string };
   if (data.status === "paid" || data.status === "captured") {
@@ -204,6 +263,67 @@ export async function finalizeStoresPayment(
     return { session, checkout: null };
   }
 
+  // 注文が既に会計済みならセッションだけ揃える（部分成功の復旧）
+  if (session.order.status === "PAID") {
+    const paidSession = await prisma.paymentSession.update({
+      where: { id: sessionId },
+      data: {
+        status: PaymentSessionStatus.PAID,
+        paymentMethod,
+        paidAt: new Date(),
+      },
+    });
+    return { session: paidSession, checkout: null };
+  }
+
+  // 注文が取消済みでもリモート支払済みなら売上だけ回収
+  if (session.order.status === "CANCELLED") {
+    const businessDate = getBusinessDate(new Date());
+    const externalId = `stores-orphan-${session.id}`;
+    const existing = await prisma.salesTransaction.findUnique({
+      where: {
+        dataSource_externalId: {
+          dataSource: DataSource.OWN_POS,
+          externalId,
+        },
+      },
+    });
+    if (!existing) {
+      await prisma.salesTransaction.create({
+        data: {
+          storeId: session.storeId,
+          externalId,
+          dataSource: DataSource.OWN_POS,
+          transactionType: TransactionType.SALE,
+          transactionAt: new Date(),
+          businessDate,
+          subtotalAmount: session.amount,
+          discountAmount: session.discountAmount,
+          totalAmount: session.amount,
+          tax10Amount: session.amount,
+          consumptionTax10: Math.round((session.amount * 10) / 110),
+          consumptionTax: Math.round((session.amount * 10) / 110),
+          customerCount: session.order.customerCount || 1,
+          staffName: session.order.staffName,
+          customerSegment: session.order.customerSegment,
+          entryTime: session.order.createdAt,
+          payments: {
+            create: { method: paymentMethod, amount: session.amount },
+          },
+        },
+      });
+    }
+    const paidSession = await prisma.paymentSession.update({
+      where: { id: sessionId },
+      data: {
+        status: PaymentSessionStatus.PAID,
+        paymentMethod,
+        paidAt: new Date(),
+      },
+    });
+    return { session: paidSession, checkout: { orphanRecovered: true } };
+  }
+
   await assertOrderReadyForCheckout(session.orderId);
 
   const checkout = await completeOrderCheckout(
@@ -214,14 +334,26 @@ export async function finalizeStoresPayment(
     session.discountAmount,
   );
 
-  const paidSession = await prisma.paymentSession.update({
-    where: { id: sessionId },
+  // CANCELLED でもリモートで支払済みなら確定する（古い URL 払いの回収）
+  const claimed = await prisma.paymentSession.updateMany({
+    where: {
+      id: sessionId,
+      status: { not: PaymentSessionStatus.PAID },
+    },
     data: {
       status: PaymentSessionStatus.PAID,
       paymentMethod,
       paidAt: new Date(),
     },
   });
+
+  const paidSession = await prisma.paymentSession.findUniqueOrThrow({
+    where: { id: sessionId },
+  });
+
+  if (claimed.count === 0 && paidSession.status !== PaymentSessionStatus.PAID) {
+    throw new Error("決済セッションの更新に失敗しました");
+  }
 
   return { session: paidSession, checkout };
 }
@@ -257,75 +389,85 @@ export async function openQrTableOrder(
   storeId: string,
   customerCount: number,
 ) {
-  const existing = await prisma.order.findFirst({
-    where: {
-      tableId,
-      status: { in: ["OPEN", "SENT_TO_KITCHEN", "READY"] },
-    },
-    include: {
-      items: {
-        where: { status: { not: "CANCELLED" } },
-        orderBy: { createdAt: "asc" },
-      },
-      table: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (existing) {
-    if (existing.channel !== OrderChannel.QR) {
-      await prisma.order.update({
-        where: { id: existing.id },
-        data: { channel: OrderChannel.QR },
-      });
-    }
-    if (existing.customerCount !== customerCount) {
-      await prisma.order.update({
-        where: { id: existing.id },
-        data: { customerCount },
-      });
-    }
-    return prisma.order.findFirstOrThrow({
-      where: { id: existing.id },
-      include: {
-        items: {
-          where: { status: { not: "CANCELLED" } },
-          orderBy: { createdAt: "asc" },
+  return prisma.$transaction(
+    async (tx) => {
+      const existing = await tx.order.findFirst({
+        where: {
+          tableId,
+          status: { in: ["OPEN", "SENT_TO_KITCHEN", "READY"] },
         },
-        table: true,
-      },
-    });
-  }
+        include: {
+          items: {
+            where: { status: { not: "CANCELLED" } },
+            orderBy: { createdAt: "asc" },
+          },
+          table: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
 
-  const table = await prisma.table.findUniqueOrThrow({ where: { id: tableId } });
-  await prisma.order.create({
-    data: {
-      storeId,
-      tableId,
-      orderNumber: await generateOrderNumber(storeId),
-      eatInType: table.eatInType,
-      customerCount,
-      channel: OrderChannel.QR,
-      status: "OPEN",
-    },
-  });
-  await prisma.table.update({
-    where: { id: tableId },
-    data: { status: "OCCUPIED" },
-  });
+      if (existing) {
+        const patch: { channel?: OrderChannel } = {};
+        if (existing.channel !== OrderChannel.QR) patch.channel = OrderChannel.QR;
+        // 人数はウェイター開始値を優先（QR開始で上書きしない）
+        if (Object.keys(patch).length > 0) {
+          await tx.order.update({
+            where: { id: existing.id },
+            data: patch,
+          });
+          return tx.order.findFirstOrThrow({
+            where: { id: existing.id },
+            include: {
+              items: {
+                where: { status: { not: "CANCELLED" } },
+                orderBy: { createdAt: "asc" },
+              },
+              table: true,
+            },
+          });
+        }
+        return existing;
+      }
 
-  return prisma.order.findFirstOrThrow({
-    where: {
-      tableId,
-      status: { in: ["OPEN", "SENT_TO_KITCHEN", "READY"] },
+      const table = await tx.table.findUniqueOrThrow({ where: { id: tableId } });
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const count = await tx.order.count({
+        where: { storeId, createdAt: { gte: start } },
+      });
+      const d = new Date();
+      const prefix = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+      await tx.order.create({
+        data: {
+          storeId,
+          tableId,
+          orderNumber: `${prefix}-${String(count + 1).padStart(4, "0")}`,
+          eatInType: table.eatInType,
+          customerCount,
+          channel: OrderChannel.QR,
+          status: "OPEN",
+        },
+      });
+      await tx.table.update({
+        where: { id: tableId },
+        data: { status: "OCCUPIED" },
+      });
+
+      return tx.order.findFirstOrThrow({
+        where: {
+          tableId,
+          status: { in: ["OPEN", "SENT_TO_KITCHEN", "READY"] },
+        },
+        include: {
+          items: {
+            where: { status: { not: "CANCELLED" } },
+            orderBy: { createdAt: "asc" },
+          },
+          table: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
     },
-    include: {
-      items: {
-        where: { status: { not: "CANCELLED" } },
-        orderBy: { createdAt: "asc" },
-      },
-      table: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
 }

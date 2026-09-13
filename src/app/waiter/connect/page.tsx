@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { WaiterHeader } from "@/components/waiter/waiter-ui";
+import { POS_ACCENT } from "@/lib/pos-theme";
 
-const ORANGE = "#e8912d";
 
 type ConnectInfo = {
   cloud?: boolean;
@@ -52,7 +52,7 @@ function UrlRow({ label, url }: { label: string; url: string }) {
     <div className="border-b border-stone-200 px-4 py-4 last:border-b-0">
       <p className="mb-1 text-[13px] font-medium text-stone-500">{label}</p>
       <div className="flex items-start justify-between gap-3">
-        <a href={url} className="break-all text-[15px] font-medium text-blue-600 underline">
+        <a href={url} className="break-all text-[15px] font-medium text-[var(--pos-accent-press)] underline">
           {url}
         </a>
         <CopyButton text={url} />
@@ -124,11 +124,11 @@ export default function ConnectPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#efefef] pb-8">
+    <div className="min-h-screen bg-[var(--pos-bg)] pb-8">
       <WaiterHeader title="スマホ接続" backHref="/waiter/settings" />
 
       {!online && (
-        <div className="mx-4 mt-3 rounded-xl bg-amber-50 px-4 py-3 text-center text-[13px] text-amber-900">
+        <div className="mx-4 mt-3 rounded-xl bg-[var(--pos-accent-soft)] px-4 py-3 text-center text-[13px] text-[var(--pos-accent-press)]">
           オフラインです。接続が戻ると自動で同期されます
         </div>
       )}
@@ -141,20 +141,17 @@ export default function ConnectPage() {
 
       <div className="mx-4 mt-4 rounded-2xl bg-white p-5 shadow-sm">
         <h2 className="text-[17px] font-bold text-stone-900">
-          {info?.cloud ? "クラウド接続（店舗PC不要）" : "どこでも接続（LTE・外出先）"}
+          {info?.cloud ? "クラウドで接続（Mac不要）" : "お店のWi-Fiで接続"}
         </h2>
         <p className="mt-2 text-[14px] leading-relaxed text-stone-600">
           {info?.cloud ? (
             <>
-              このURLはインターネット上で常時稼働しています。
-              <strong> 店舗のMacを起動していなくても</strong>
-              使えます。下のQRを読み取り、ホーム画面に追加してください。
+              ウェイターとキッチンは<strong>インターネット</strong>（LTE / Wi‑Fiどちらでも可）で開きます。店舗に Mac
+              や PC を置く必要はありません。
             </>
           ) : (
             <>
-              店舗 Wi‑Fi 以外（LTE など）からも使える HTTPS URL です。下の QR を読み取って Safari で開き、
-              <strong> ホーム画面に追加</strong>
-              してください。
+              ウェイターとキッチンは<strong>お店のWi-Fi</strong>で開きます。お客様のQR注文は携帯回線なので、この端末をお客様用Wi-Fiに繋ぐ必要はありません。
             </>
           )}
         </p>
@@ -169,19 +166,9 @@ export default function ConnectPage() {
               <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-[14px] font-medium text-emerald-800">
                 ✓ クラウド本番 — Mac常駐不要 · {info.baseUrl}
               </p>
-            ) : info.remoteActive ? (
-              <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-[14px] font-medium text-emerald-800">
-                ✓ どこでも接続 ON — {info.baseUrl}
-              </p>
             ) : (
-              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[14px] text-amber-900">
-                ローカル店舗サーバーです。外出先から使うには Vercel 本番デプロイを推奨します。
-              </p>
-            )}
-
-            {info.lanUrl && info.remoteActive && info.lanUrl !== info.baseUrl && (
-              <p className="mt-2 text-[13px] text-stone-500">
-                店舗 Wi‑Fi 用: {info.lanUrl}
+              <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-[14px] font-medium text-emerald-800">
+                ✓ お店のWi-Fi用 — {info.lanUrl || info.waiterUrl}
               </p>
             )}
 
@@ -221,7 +208,7 @@ export default function ConnectPage() {
         <a
           href="/waiter/install"
           className="mt-4 flex w-full items-center justify-center rounded-xl py-3.5 text-[15px] font-semibold text-white"
-          style={{ backgroundColor: ORANGE }}
+          style={{ backgroundColor: POS_ACCENT }}
         >
           アプリに追加する手順を見る
         </a>
@@ -250,7 +237,7 @@ export default function ConnectPage() {
         </p>
       </div>
 
-      <div className="mx-4 mt-4 rounded-2xl border border-dashed p-5" style={{ borderColor: ORANGE }}>
+      <div className="mx-4 mt-4 rounded-2xl border border-dashed p-5" style={{ borderColor: POS_ACCENT }}>
         <h2 className="text-[15px] font-bold text-stone-800">キッチン用 iPad / タブレット</h2>
         <p className="mt-2 text-[14px] leading-relaxed text-stone-600">
           キッチンQRを読み取り、Safariでホーム画面に追加。充電しながら常時表示してください。
@@ -266,22 +253,21 @@ export default function ConnectPage() {
       </div>
 
       <div className="mx-4 mt-4 rounded-2xl bg-stone-100 p-5">
-        <h2 className="text-[15px] font-bold text-stone-800">
-          {info?.cloud ? "クラウド運用のポイント" : "本番デプロイのチェックリスト"}
-        </h2>
+        <h2 className="text-[15px] font-bold text-stone-800">使い分け</h2>
         <ul className="mt-3 space-y-2 text-[14px] leading-relaxed text-stone-600">
           {info?.cloud ? (
             <>
-              <li>• 店舗のMacは不要 — このURLが常時稼働</li>
-              <li>• iPhone / iPad をホーム画面に追加して使う</li>
-              <li>• キッチン伝票は /kitchen 画面で表示</li>
-              <li>• レシートは STORES 決済端末を使用</li>
+              <li>• ウェイター / キッチン … クラウドURL（LTE / Wi‑Fiどちらでも可）</li>
+              <li>• お客様のQR注文 … 同じクラウドURL（テーブル常設シール）</li>
+              <li>• 管理画面 … 同じURLの /admin</li>
+              <li>• 伝票はキッチン画面、レシートはSTORES端末（店舗Mac不要）</li>
             </>
           ) : (
             <>
-              <li>• Vercel + Neon でデプロイすると Mac 不要になります</li>
-              <li>• <code className="text-[13px]">PUBLIC_BASE_URL</code> を本番URLに設定</li>
-              <li>• 各スタッフ端末でホーム画面に追加</li>
+              <li>• ウェイター / キッチン … お店のWi-Fi（このページのURL）</li>
+              <li>• お客様のQR注文 … 携帯回線（お店のWi-Fi不要）</li>
+              <li>• 管理画面 … 外出先からも公開URLで入れます</li>
+              <li>• プリンターは店内サーバー稼働時のみ利用できます</li>
             </>
           )}
         </ul>

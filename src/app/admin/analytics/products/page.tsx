@@ -18,7 +18,7 @@ export default async function ProductSalesPage() {
   return (
     <>
       <PageHeader title="商品別売上" description="販売数・売上・構成比" />
-      <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+      <section className="mb-8 admin-card p-6">
         <ProductBarChart data={products.slice(0, 15).map((p) => ({ name: p.name, sales: p.sales }))} />
       </section>
       <StatTable

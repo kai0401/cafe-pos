@@ -4,9 +4,9 @@ import {
   addAndSendOrderItems,
   addOrderItems,
   assertOrderReadyForCheckout,
-  getCategoryProducts,
-  getFullMenu,
-  getProductModifierGroups,
+  getQrCategoryProducts,
+  getQrGuestMenu,
+  getQrModifierGroups,
   sendOrderToKitchen,
 } from "@/domain/order/order-service";
 import {
@@ -18,19 +18,21 @@ import {
   syncStoresOnlinePayment,
   validateQrTableAccess,
 } from "@/domain/payment/stores-payment-service";
-import { getDefaultStore } from "@/lib/prisma";
-import { ensureWaiterSetup } from "@/lib/waiter-setup";
-
-function getBaseUrl(request: Request) {
-  const host = request.headers.get("host") ?? "localhost:3000";
-  const proto = request.headers.get("x-forwarded-proto") ?? "http";
-  return `${proto}://${host}`;
-}
+import { getDefaultStore, prisma } from "@/lib/prisma";
+import { getPublicBaseUrlFromRequest } from "@/lib/public-base-url";
 
 async function requireQrAccess(tableId: string, token: string) {
   const table = await validateQrTableAccess(tableId, token);
   const store = await getDefaultStore();
   return { table, store };
+}
+
+async function requireOrderForTable(orderId: string, tableId: string) {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order || order.tableId !== tableId) {
+    throw new Error("このテーブルの注文ではありません");
+  }
+  return order;
 }
 
 export async function GET(request: Request) {
@@ -45,35 +47,31 @@ export async function GET(request: Request) {
     }
 
     const { table, store } = await requireQrAccess(tableId, token);
-    const order = await import("@/lib/prisma").then((m) =>
-      m.prisma.order.findFirst({
-        where: {
-          tableId,
-          status: { in: ["OPEN", "SENT_TO_KITCHEN", "READY"] },
+    const order = await prisma.order.findFirst({
+      where: {
+        tableId,
+        status: { in: ["OPEN", "SENT_TO_KITCHEN", "READY"] },
+      },
+      include: {
+        items: {
+          where: { status: { not: "CANCELLED" } },
+          orderBy: { createdAt: "asc" },
         },
-        include: {
-          items: {
-            where: { status: { not: "CANCELLED" } },
-            orderBy: { createdAt: "asc" },
-          },
-          table: true,
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-    );
+        table: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
     let paymentSession = order ? await getActivePaymentSession(order.id) : null;
     if (!paymentSession) {
-      const recentPaid = await import("@/lib/prisma").then((m) =>
-        m.prisma.paymentSession.findFirst({
-          where: {
-            order: { tableId },
-            status: PaymentSessionStatus.PAID,
-            paidAt: { gte: new Date(Date.now() - 3 * 60 * 60 * 1000) },
-          },
-          orderBy: { paidAt: "desc" },
-        }),
-      );
+      const recentPaid = await prisma.paymentSession.findFirst({
+        where: {
+          order: { tableId },
+          status: PaymentSessionStatus.PAID,
+          paidAt: { gte: new Date(Date.now() - 3 * 60 * 60 * 1000) },
+        },
+        orderBy: { paidAt: "desc" },
+      });
       if (recentPaid) paymentSession = recentPaid;
     }
     if (syncPayment && paymentSession?.status === "AWAITING_ONLINE") {
@@ -82,6 +80,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       table: { id: table.id, name: table.name, eatInType: table.eatInType },
+      storeName: store.name,
       order,
       storesEnabled: await isStoresEnabled(store.id),
       storesApiConfigured: isStoresApiConfigured(),
@@ -116,19 +115,24 @@ export async function POST(request: Request) {
       const eatInType = table.eatInType;
       const categoryId = body.categoryId as string | undefined;
       if (body.modifiers && categoryId) {
-        const groups = await getProductModifierGroups(store.id, categoryId, eatInType);
+        const groups = await getQrModifierGroups(
+          store.id,
+          categoryId,
+          eatInType,
+          typeof body.productName === "string" ? body.productName : null,
+        );
         return NextResponse.json(groups);
       }
       if (categoryId) {
-        const products = await getCategoryProducts(store.id, categoryId, eatInType);
+        const products = await getQrCategoryProducts(store.id, categoryId, eatInType);
         return NextResponse.json(products);
       }
-      const menu = await getFullMenu(store.id, eatInType);
+      const menu = await getQrGuestMenu(store.id, eatInType);
       return NextResponse.json(
         menu.map((c) => ({
           id: c.id,
           name: c.name,
-          productCount: c.products.length,
+          productCount: c.productCount,
           hasModifiers: c.hasModifiers,
         })),
       );
@@ -145,6 +149,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "send" && orderId) {
+      await requireOrderForTable(orderId, tableId);
       const order = await sendOrderToKitchen(orderId);
       return NextResponse.json(order);
     }
@@ -153,18 +158,17 @@ export async function POST(request: Request) {
       if (!(await isStoresEnabled(store.id))) {
         return NextResponse.json({ error: "STORES決済が無効です" }, { status: 400 });
       }
+      await requireOrderForTable(orderId, tableId);
       await assertOrderReadyForCheckout(orderId);
-      const orderItems = await import("@/lib/prisma").then((m) =>
-        m.prisma.orderItem.findMany({
-          where: { orderId, status: { not: "CANCELLED" } },
-        }),
-      );
+      const orderItems = await prisma.orderItem.findMany({
+        where: { orderId, status: { not: "CANCELLED" } },
+      });
       const amount = orderItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
       const session = await createStoresPaymentSession({
         orderId,
         storeId: store.id,
         amount,
-        baseUrl: getBaseUrl(request),
+        baseUrl: getPublicBaseUrlFromRequest(request),
         mode: mode ?? "online",
       });
       return NextResponse.json({ session });

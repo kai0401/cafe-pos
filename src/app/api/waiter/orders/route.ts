@@ -7,12 +7,16 @@ import {
   completeOrderCheckout,
   getTableOrder,
   markItemServed,
+  mergeOrdersInto,
+  moveOrderToTable,
   openTableOrder,
   sendOrderToKitchen,
+  splitOrderToTable,
   updateOrderMeta,
   updatePendingItemQuantity,
 } from "@/domain/order/order-service";
 import { ensureWaiterSetup } from "@/lib/waiter-setup";
+import { withIdempotency } from "@/lib/idempotency";
 import { getDefaultStore, prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
@@ -32,11 +36,22 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action, tableId, orderId, items, customerCount, itemId, quantity } = body;
+    const {
+      action,
+      tableId,
+      orderId,
+      items,
+      customerCount,
+      itemId,
+      quantity,
+      idempotencyKey,
+    } = body;
 
     if (action === "addAndSend" && tableId && items?.length) {
       const store = await ensureWaiterSetup();
-      const order = await addAndSendOrderItems(tableId, store.id, items);
+      const order = await withIdempotency(idempotencyKey, store.id, () =>
+        addAndSendOrderItems(tableId, store.id, items),
+      );
       return NextResponse.json(order);
     }
 
@@ -92,13 +107,30 @@ export async function POST(request: Request) {
       return NextResponse.json(order);
     }
 
+    if (action === "moveTable" && orderId && body.targetTableId) {
+      const result = await moveOrderToTable(orderId, body.targetTableId);
+      return NextResponse.json(result);
+    }
+
+    if (action === "splitTable" && orderId && body.targetTableId && Array.isArray(body.itemIds)) {
+      const result = await splitOrderToTable(orderId, body.targetTableId, body.itemIds);
+      return NextResponse.json(result);
+    }
+
+    if (action === "mergeTable" && orderId && body.sourceOrderId) {
+      const order = await mergeOrdersInto(orderId, body.sourceOrderId);
+      return NextResponse.json(order);
+    }
+
     if (action === "open" && tableId) {
       const order = await openTableOrder(tableId, store.id, customerCount ?? 1);
       return NextResponse.json(order);
     }
 
     if (action === "send" && orderId) {
-      const order = await sendOrderToKitchen(orderId);
+      const order = await withIdempotency(idempotencyKey, store.id, () =>
+        sendOrderToKitchen(orderId),
+      );
       return NextResponse.json(order);
     }
 
@@ -114,7 +146,9 @@ export async function POST(request: Request) {
     }
 
     if (tableId && items?.length) {
-      const order = await addOrderItems(tableId, store.id, items);
+      const order = await withIdempotency(idempotencyKey, store.id, () =>
+        addOrderItems(tableId, store.id, items),
+      );
       return NextResponse.json(order);
     }
 

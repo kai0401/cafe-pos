@@ -1,5 +1,5 @@
 import { getProfitLossReport } from "@/domain/analytics/analytics-service";
-import { ProfitLossGameReport } from "@/components/admin/profit-loss-game-report";
+import { ProfitLossReport } from "@/components/admin/profit-loss-report";
 import { EmptyState } from "@/components/admin/ui";
 
 export default async function ProfitLossReportPage() {
@@ -14,5 +14,5 @@ export default async function ProfitLossReportPage() {
     return <EmptyState message="データがありません。CSVをインポートしてください。" />;
   }
 
-  return <ProfitLossGameReport report={report} />;
+  return <ProfitLossReport report={report} />;
 }

@@ -1,4 +1,5 @@
 import { DataSource, PaymentMethodType } from "@prisma/client";
+import { cache } from "react";
 import {
   countBusinessDays,
   formatJST,
@@ -62,6 +63,11 @@ function mergeDailySummaries(rows: DailySummaryRow[]) {
 }
 
 async function resolveFilter(filter: AnalyticsFilter) {
+  return resolveFilterCached(JSON.stringify(filter));
+}
+
+const resolveFilterCached = cache(async (filterKey: string) => {
+  const filter = JSON.parse(filterKey || "{}") as AnalyticsFilter;
   const store = await getDefaultStore();
   const summaries = mergeDailySummaries(
     await prisma.salesDailySummary.findMany({
@@ -78,7 +84,7 @@ async function resolveFilter(filter: AnalyticsFilter) {
     : summaries[summaries.length - 1]?.businessDate ?? new Date();
 
   return { store, startDate, endDate, summaries };
-}
+});
 
 function inRange(date: Date, start: Date, end: Date): boolean {
   return date >= start && date <= end;

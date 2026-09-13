@@ -1,9 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #efefef;
+  --foreground: #292524;
   --waiter-width: min(390px, 100vw);
+  --pos-accent: #e8912d;
+  --pos-accent-press: #d4821f;
+  --pos-accent-soft: #fff4e5;
+  --pos-bg: #efefef;
+  --pos-surface: #ffffff;
+  --pos-ink: #292524;
+  --pos-muted: #78716c;
+  --pos-line: #e7e5e4;
+  --pos-danger: #dc2626;
+  --pos-success: #059669;
 }
 
 @theme inline {
@@ -13,11 +23,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* 店舗アプリは常にライト。OSダークモードで色が割れないようにする */
+.waiter-shell,
+.pos-shell,
+.admin-shell {
+  color-scheme: light;
+}
+
+/* キッチンは暗色 UI（フォーム等をダークで統一） */
+.kitchen-shell {
+  color-scheme: dark;
 }
 
 html {
@@ -211,6 +226,35 @@ body {
   height: 100%;
   background: var(--admin-accent);
   transition: width 0.3s ease;
+}
+
+.pos-shell {
+  background: var(--pos-bg);
+  color: var(--pos-ink);
+}
+
+.pos-shell .pos-top-bar {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  min-height: calc(2.75rem + env(safe-area-inset-top, 0px));
+  background: var(--pos-accent);
+  color: #fff;
+}
+
+/* トップバー直下に貼り付くサブナビ（ノッチ端末の safe-area を考慮） */
+.pos-shell .pos-subnav {
+  position: sticky;
+  top: calc(58px + env(safe-area-inset-top, 0px));
+}
+
+/* 画面下部固定バー：ホームインジケーターと重ならないようにする */
+.pos-shell .pos-bottom-bar {
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* 固定バーの高さぶんコンテンツ下部を空ける */
+.pos-shell .pos-scroll-pad {
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* ウェイター: iPhone サイズ（390pt 基準） */

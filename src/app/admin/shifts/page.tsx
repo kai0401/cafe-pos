@@ -332,7 +332,7 @@ export default function ShiftsPage() {
       <div
         key={cell.date}
         className={`flex min-h-[88px] flex-col border-r border-b border-[var(--admin-line)]/60 p-1 last:border-r-0 ${
-          cell.inMonth ? "bg-white" : "bg-[var(--admin-paper)]/50"
+          cell.inMonth ? "bg-[var(--admin-paper-raised)]" : "bg-[var(--admin-paper)]/50"
         } ${cell.isToday ? "ring-1 ring-inset ring-[var(--admin-accent)]" : ""}`}
       >
         <div className="mb-1 flex items-center justify-between gap-1">
@@ -530,11 +530,11 @@ export default function ShiftsPage() {
           </div>
         </div>
 
-        <div className="admin-card overflow-hidden">
+        <div className="admin-card overflow-x-auto">
           {viewMode !== bundle.view ? (
             <div className="p-10 text-center text-sm text-[var(--admin-muted)]">読み込み中…</div>
           ) : viewMode === "week" && bundle.view === "week" ? (
-            <>
+            <div className="min-w-[640px]">
               <div className="grid grid-cols-7 border-b border-[var(--admin-line)] bg-[var(--admin-paper)]">
                 {bundle.week.days.map((day) => (
                   <div key={day.date} className="border-r border-[var(--admin-line)]/60 px-2 py-3 text-center last:border-r-0">
@@ -546,9 +546,9 @@ export default function ShiftsPage() {
               <div className="grid min-h-[320px] grid-cols-7">
                 {bundle.week.days.map((day) => renderDayColumn(day))}
               </div>
-            </>
+            </div>
           ) : bundle.view === "month" ? (
-            <>
+            <div className="min-w-[640px]">
               <div className="grid grid-cols-7 border-b border-[var(--admin-line)] bg-[var(--admin-paper)]">
                 {DOW_HEADERS.map((dow) => (
                   <div
@@ -562,7 +562,7 @@ export default function ShiftsPage() {
               <div className="grid grid-cols-7">
                 {bundle.month.cells.map((cell) => renderMonthCell(cell))}
               </div>
-            </>
+            </div>
           ) : null}
         </div>
       </div>

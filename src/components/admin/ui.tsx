@@ -83,7 +83,10 @@ export function StatTable({
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} className="border-t border-[var(--admin-line)]/60">
+            <tr
+              key={i}
+              className="border-t border-[var(--admin-line)]/60 transition-colors hover:bg-[var(--admin-accent-soft)]/40"
+            >
               {row.map((cell, j) => (
                 <td key={j} className="px-4 py-3 text-[var(--admin-ink)]">
                   {typeof cell === "number"

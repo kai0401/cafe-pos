@@ -1,4 +1,4 @@
-const CACHE = "cafe-kitchen-v1";
+const CACHE = "cafe-kitchen-v2";
 const PRECACHE = [
   "/icons/kitchen-icon-192.png",
   "/icons/kitchen-icon-512.png",

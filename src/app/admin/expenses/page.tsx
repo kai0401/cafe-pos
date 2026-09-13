@@ -219,9 +219,7 @@ export default function ExpensesPage() {
                         <span className="admin-tag ml-2 !py-0 text-[10px]">レシート</span>
                       )}
                       {e.isRecurring && (
-                        <span className="ml-1 rounded bg-[var(--admin-accent-soft)] px-1.5 py-0.5 text-[10px] text-[var(--admin-accent)]">
-                          固定費
-                        </span>
+                        <span className="admin-tag ml-1 !py-0 text-[10px]">固定費</span>
                       )}
                     </p>
                     <p className="text-xs text-[var(--admin-muted)]">

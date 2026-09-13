@@ -30,7 +30,7 @@ export default async function DailySalesPage() {
         title="日別売上"
         description="全日表示（木曜・営業時間外の取引も含む）"
       />
-      <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+      <section className="mb-8 admin-card p-6">
         <SalesLineChart data={daily} />
       </section>
       <StatTable

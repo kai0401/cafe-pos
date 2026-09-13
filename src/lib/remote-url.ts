@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -6,24 +7,12 @@ export type RemoteUrlInfo = {
   updatedAt: string;
 };
 
-export async function getRemoteBaseUrl(): Promise<string | null> {
-  try {
-    const file = path.join(process.cwd(), ".shop-remote-url.json");
-    const raw = await readFile(file, "utf8");
-    const data = JSON.parse(raw) as Partial<RemoteUrlInfo>;
-    if (typeof data.url === "string" && data.url.startsWith("http")) {
-      return data.url.replace(/\/$/, "");
-    }
-  } catch {
-    // no tunnel yet
-  }
-  return null;
+function remoteFilePath() {
+  return path.join(process.cwd(), ".shop-remote-url.json");
 }
 
-export async function getRemoteUrlInfo(): Promise<RemoteUrlInfo | null> {
+function parseRemote(raw: string): RemoteUrlInfo | null {
   try {
-    const file = path.join(process.cwd(), ".shop-remote-url.json");
-    const raw = await readFile(file, "utf8");
     const data = JSON.parse(raw) as Partial<RemoteUrlInfo>;
     if (typeof data.url === "string" && data.url.startsWith("http")) {
       return {
@@ -32,7 +21,32 @@ export async function getRemoteUrlInfo(): Promise<RemoteUrlInfo | null> {
       };
     }
   } catch {
-    // no tunnel yet
+    // ignore
   }
   return null;
 }
+
+export function getRemoteUrlInfoSync(): RemoteUrlInfo | null {
+  try {
+    return parseRemote(readFileSync(remoteFilePath(), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+export async function getRemoteUrlInfo(): Promise<RemoteUrlInfo | null> {
+  try {
+    return parseRemote(await readFile(remoteFilePath(), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+export async function getRemoteBaseUrl(): Promise<string | null> {
+  return (await getRemoteUrlInfo())?.url ?? null;
+}
+
+export function getRemoteBaseUrlSync(): string | null {
+  return getRemoteUrlInfoSync()?.url ?? null;
+}
+

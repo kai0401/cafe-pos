@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   getCategories,
   getCategoryProducts,
+  getCategoryProductsAll,
   getFullMenu,
   getModifierProductsMenu,
   getProductModifierGroups,
@@ -27,12 +28,16 @@ export async function GET(request: Request) {
     }
 
     if (categoryId && modifiers) {
-      const groups = await getProductModifierGroups(store.id, categoryId, eatInType);
+      const productName = searchParams.get("productName");
+      const groups = await getProductModifierGroups(store.id, categoryId, eatInType, productName);
       return NextResponse.json(groups);
     }
 
     if (categoryId) {
-      const products = await getCategoryProducts(store.id, categoryId, eatInType);
+      const products =
+        searchParams.get("all") === "1"
+          ? await getCategoryProductsAll(store.id, categoryId, eatInType)
+          : await getCategoryProducts(store.id, categoryId, eatInType);
       return NextResponse.json(products);
     }
 

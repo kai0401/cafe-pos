@@ -11,6 +11,8 @@ type PrinterConfig = {
   kickDrawer: boolean;
   cols: number;
   storeName: string;
+  supported?: boolean;
+  cloudNote?: string | null;
 };
 
 function ToggleRow({
@@ -35,7 +37,7 @@ function ToggleRow({
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${checked ? "bg-emerald-500" : "bg-stone-300"}`}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${checked ? "bg-[var(--pos-accent)]" : "bg-stone-300"}`}
       >
         <span
           className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-[22px]" : "translate-x-0.5"}`}
@@ -51,6 +53,9 @@ export default function PrinterSettingsPage() {
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
+  const [found, setFound] = useState<{ ip: string; port: number }[]>([]);
+  const [reach, setReach] = useState<"unknown" | "ok" | "fail">("unknown");
 
   useEffect(() => {
     fetch("/api/printer")
@@ -62,46 +67,101 @@ export default function PrinterSettingsPage() {
       .catch(() => setLoadError("プリンター設定の読み込みに失敗しました"));
   }, []);
 
+  useEffect(() => {
+    if (!config?.ip || config.supported === false) return;
+    let cancelled = false;
+    fetch("/api/printer/probe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ip: config.ip, port: config.port }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setReach(data.reachable ? "ok" : "fail");
+      })
+      .catch(() => {
+        if (!cancelled) setReach("fail");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [config?.ip, config?.port, config?.supported]);
+
   function update(patch: Partial<PrinterConfig>) {
     setConfig((c) => (c ? { ...c, ...patch } : c));
+    if (patch.ip !== undefined || patch.port !== undefined) setReach("unknown");
   }
 
-  async function save() {
-    if (!config) return;
+  async function save(next = config) {
+    if (!next) return false;
     setSaving(true);
     try {
       const res = await fetch("/api/printer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
+        body: JSON.stringify(next),
       });
+      const data = await res.json();
       if (res.ok) {
-        setConfig(await res.json());
+        setConfig(data);
         setToast("保存しました");
-      } else {
-        const data = await res.json();
-        setToast(data.error ?? "保存に失敗しました");
+        return true;
       }
+      setToast(data.error ?? "保存に失敗しました");
+      return false;
     } finally {
       setSaving(false);
     }
   }
 
+  async function discover() {
+    setDiscovering(true);
+    setFound([]);
+    try {
+      const res = await fetch("/api/printer/discover");
+      const data = await res.json();
+      if (!res.ok) {
+        setToast(data.error ?? "検索に失敗しました");
+        return;
+      }
+      const printers = Array.isArray(data.printers) ? data.printers : [];
+      setFound(printers);
+      if (printers.length === 0) {
+        setToast("見つかりませんでした。電源とWi‑Fiを確認してください");
+      } else if (printers.length === 1 && printers[0]) {
+        update({ ip: printers[0].ip, port: printers[0].port });
+        setToast(`見つかりました: ${printers[0].ip}`);
+      } else {
+        setToast(`${printers.length}台見つかりました。IPを選んでください`);
+      }
+    } catch {
+      setToast("検索に失敗しました");
+    } finally {
+      setDiscovering(false);
+    }
+  }
+
   async function testPrint() {
     if (!config?.ip) {
-      setToast("先にIPアドレスを入力して保存してください");
+      setToast("先にIPアドレスを入力するか、検索してください");
       return;
     }
     setTesting(true);
     try {
-      await fetch("/api/printer", {
+      await save(config);
+      const res = await fetch("/api/printer/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
+        body: JSON.stringify({ ip: config.ip, port: config.port, cols: config.cols }),
       });
-      const res = await fetch("/api/printer/test", { method: "POST" });
       const data = await res.json();
-      setToast(res.ok ? "テスト印刷を送信しました" : (data.error ?? "テスト印刷に失敗しました"));
+      if (res.ok) {
+        setReach("ok");
+        setToast("テスト印刷を送信しました");
+      } else {
+        setReach("fail");
+        setToast(data.error ?? "テスト印刷に失敗しました");
+      }
     } finally {
       setTesting(false);
     }
@@ -109,7 +169,7 @@ export default function PrinterSettingsPage() {
 
   if (loadError) {
     return (
-      <div className="flex min-h-screen flex-col bg-[#efefef]">
+      <div className="flex min-h-screen flex-col bg-[var(--pos-bg)]">
         <WaiterHeader title="プリンター設定" backHref="/waiter/settings" />
         <p className="p-8 text-center text-[14px] text-red-600">{loadError}</p>
       </div>
@@ -118,18 +178,45 @@ export default function PrinterSettingsPage() {
 
   if (!config) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#efefef] text-stone-500">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--pos-bg)] text-stone-500">
         読み込み中…
       </div>
     );
   }
 
+  if (config.supported === false) {
+    return (
+      <div className="min-h-screen bg-[var(--pos-bg)] pb-8">
+        <WaiterHeader title="プリンター設定" backHref="/waiter/settings" />
+        <div className="m-4 rounded-xl bg-white p-5 text-[14px] leading-relaxed text-stone-700">
+          <p className="font-semibold text-stone-900">クラウド運用では LAN プリンターは使えません</p>
+          <p className="mt-3">
+            {config.cloudNote ?? "キッチンは画面表示、レシートは STORES 端末を使ってください。"}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#efefef] pb-8">
+    <div className="min-h-screen bg-[var(--pos-bg)] pb-8">
       <WaiterHeader title="プリンター設定" backHref="/waiter/settings" />
 
-      <div className="bg-[#efefef] px-4 py-2 text-[12px] font-medium text-stone-500">
-        Epson TM-m30（LAN / Wi‑Fi 接続）
+      <div className="mx-4 mt-3 rounded-xl border border-stone-200 bg-white px-4 py-3">
+        <p className="text-[13px] text-stone-500">接続状態</p>
+        <p className="mt-1 text-[16px] font-semibold text-stone-900">
+          {!config.ip
+            ? "未設定 — 同じWi‑Fiから探してください"
+            : reach === "ok"
+              ? `接続OK（${config.ip}）`
+              : reach === "fail"
+                ? `つながりません（${config.ip}）`
+                : `確認中…（${config.ip}）`}
+        </p>
+      </div>
+
+      <div className="bg-[var(--pos-bg)] px-4 py-2 text-[12px] font-medium text-stone-500">
+        Epson TM-m30（LAN / Wi‑Fi）
       </div>
 
       <div className="border-b border-stone-200 bg-white px-4 py-3.5">
@@ -143,9 +230,31 @@ export default function PrinterSettingsPage() {
           className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-[16px]"
         />
         <p className="mt-1.5 text-[12px] text-stone-400">
-          プリンター本体のステータスシート（電源投入時に紙送りボタン長押し）で確認できます
+          電源投入時に紙送りボタン長押しでステータスシートのIPを確認できます
         </p>
       </div>
+
+      {found.length > 1 && (
+        <div className="border-b border-stone-200 bg-white px-4 py-3">
+          <p className="mb-2 text-[13px] text-stone-500">見つかったプリンター</p>
+          <div className="flex flex-col gap-2">
+            {found.map((p) => (
+              <button
+                key={p.ip}
+                type="button"
+                onClick={() => update({ ip: p.ip, port: p.port })}
+                className={`rounded-lg border px-3 py-2.5 text-left text-[15px] ${
+                  config.ip === p.ip
+                    ? "border-[var(--pos-accent)] bg-[var(--pos-accent-soft)]"
+                    : "border-stone-200"
+                }`}
+              >
+                {p.ip}:{p.port}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-3 border-b border-stone-200 bg-white px-4 py-3.5">
         <div className="flex-1">
@@ -180,7 +289,7 @@ export default function PrinterSettingsPage() {
         />
       </div>
 
-      <div className="bg-[#efefef] px-4 py-2 text-[12px] font-medium text-stone-500">自動印刷</div>
+      <div className="bg-[var(--pos-bg)] px-4 py-2 text-[12px] font-medium text-stone-500">自動印刷</div>
 
       <ToggleRow
         label="注文伝票"
@@ -202,10 +311,13 @@ export default function PrinterSettingsPage() {
       />
 
       <div className="mt-6 space-y-3 px-4">
-        <PrimaryButton onClick={save} disabled={saving}>
+        <PrimaryButton onClick={discover} disabled={discovering}>
+          {discovering ? "検索中…" : "同じWi‑Fiから探す"}
+        </PrimaryButton>
+        <PrimaryButton onClick={() => void save()} disabled={saving || !config.ip}>
           {saving ? "保存中…" : "保存"}
         </PrimaryButton>
-        <PrimaryButton onClick={testPrint} disabled={testing} variant="secondary">
+        <PrimaryButton onClick={testPrint} disabled={testing || !config.ip} variant="secondary">
           {testing ? "送信中…" : "テスト印刷"}
         </PrimaryButton>
       </div>

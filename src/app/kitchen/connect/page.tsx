@@ -67,8 +67,8 @@ export default function KitchenConnectPage() {
 
   return (
     <div className="min-h-screen bg-stone-950 pb-8 text-white">
-      <header className="kitchen-top-bar sticky top-0 z-20 flex shrink-0 items-center bg-stone-900 px-3">
-        <Link href="/kitchen/open" className="kitchen-header-btn min-w-[72px] text-[15px] text-amber-400">
+      <header className="kitchen-top-bar sticky top-0 z-20 flex shrink-0 items-center bg-[var(--pos-accent)] px-3">
+        <Link href="/kitchen/open" className="kitchen-header-btn min-w-[72px] text-[15px] text-white">
           ‹ 戻る
         </Link>
         <h1 className="flex-1 text-center text-[16px] font-semibold">キッチン接続</h1>
@@ -77,13 +77,24 @@ export default function KitchenConnectPage() {
 
       <div className="mx-4 mt-4 rounded-2xl bg-stone-900 p-5">
         <h2 className="text-[17px] font-bold">
-          {info?.cloud ? "クラウド接続（店舗PC不要）" : "どこでも接続（LTE・外出先）"}
+          {info?.cloud ? "クラウドで接続（Mac不要）" : "お店のWi-Fiで接続"}
         </h2>
         <p className="mt-2 text-[14px] leading-relaxed text-stone-400">
-          iPad / タブレットで下の QR を読み取り、Safari で開いて
-          <strong className="text-stone-200"> ホーム画面に追加</strong>
-          してください。
-          {info?.cloud && " Macを起動していなくても使えます。"}
+          {info?.cloud ? (
+            <>
+              キッチンモニターは<strong className="text-stone-200">インターネット</strong>
+              （LTE / Wi‑Fiどちらでも可）で開きます。下の QR を読み取り、Safari で
+              <strong className="text-stone-200"> ホーム画面に追加</strong>
+              してください。店舗に Mac は不要です。
+            </>
+          ) : (
+            <>
+              キッチンモニターは<strong className="text-stone-200">お店のWi-Fi</strong>に繋いだ iPad /
+              タブレットで開きます。下の QR を読み取り、Safari で
+              <strong className="text-stone-200"> ホーム画面に追加</strong>
+              してください。
+            </>
+          )}
         </p>
 
         {loading && <p className="mt-3 text-[14px] text-stone-500">読み込み中…</p>}
@@ -93,20 +104,12 @@ export default function KitchenConnectPage() {
           <>
             {info.cloud ? (
               <p className="mt-3 rounded-lg bg-emerald-900/40 px-3 py-2 text-[14px] text-emerald-300">
-                ✓ クラウド本番 — 常時稼働
-              </p>
-            ) : info.remoteActive ? (
-              <p className="mt-3 rounded-lg bg-emerald-900/40 px-3 py-2 text-[14px] text-emerald-300">
-                ✓ どこでも接続 ON
+                ✓ クラウド本番 — 常時稼働 · {info.baseUrl}
               </p>
             ) : (
-              <p className="mt-3 rounded-lg bg-amber-900/30 px-3 py-2 text-[14px] text-amber-200">
-                ローカル店舗サーバー — Vercel本番デプロイを推奨
+              <p className="mt-3 rounded-lg bg-emerald-900/40 px-3 py-2 text-[14px] text-emerald-300">
+                ✓ お店のWi-Fi用 — {info.lanUrl || info.kitchenUrl}
               </p>
-            )}
-
-            {info.lanUrl && info.remoteActive && info.lanUrl !== info.baseUrl && (
-              <p className="mt-2 text-[13px] text-stone-500">店舗 Wi‑Fi: {info.lanUrl}/kitchen</p>
             )}
 
             <div className="mt-5 flex justify-center">

@@ -79,6 +79,13 @@ async function assertNoOverlap(
   }
 }
 
+/** シフト画面用の役割プレースホルダ（個人名ではないのでウェイター候補から除外） */
+export const ROLE_PLACEHOLDER_STAFF_NAMES = new Set(["店長", "ホール", "キッチン"]);
+
+export function isRolePlaceholderStaffName(name: string) {
+  return ROLE_PLACEHOLDER_STAFF_NAMES.has(name.trim());
+}
+
 export async function ensureDefaultStaff(storeId: string) {
   const count = await prisma.staffMember.count({ where: { storeId } });
   if (count > 0) return;
@@ -340,13 +347,17 @@ export async function getOnDutyStaffNames(storeId: string, date = formatJST(new 
     orderBy: { startTime: "asc" },
   });
 
-  const names = [
-    ...new Set(shifts.filter((s) => s.staff.isActive).map((s) => s.staff.name)),
+  const fromShifts = [
+    ...new Set(
+      shifts
+        .filter((s) => s.staff.isActive && !isRolePlaceholderStaffName(s.staff.name))
+        .map((s) => s.staff.name),
+    ),
   ];
-  if (names.length > 0) return names;
+  if (fromShifts.length > 0) return fromShifts;
 
   const all = await listStaff(storeId, true);
-  return all.map((s) => s.name);
+  return all.map((s) => s.name).filter((name) => !isRolePlaceholderStaffName(name));
 }
 
 /** 期間内のシフト人件費見込み（時給登録スタッフのみ） */

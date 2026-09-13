@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import { POS_ACCENT } from "@/lib/pos-theme";
 import { RegisterServiceWorker } from "@/components/pwa/register-service-worker";
-import { StaffAuthGuard } from "@/components/pwa/staff-auth-guard";
 import { WaiterInstallPrompt } from "@/components/pwa/waiter-install-prompt";
 import { WaiterOfflineBanner } from "@/components/pwa/waiter-offline-banner";
+import { WaiterStaffGate } from "@/components/waiter/waiter-staff-gate";
 
 export const metadata: Metadata = {
   title: "ウェイター",
@@ -30,18 +31,20 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#e8912d",
+  themeColor: POS_ACCENT,
 };
 
 export default function WaiterLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="waiter-shell min-h-[100dvh] bg-stone-950">
+    <div className="waiter-shell min-h-[100dvh] bg-[var(--pos-bg)]">
       <RegisterServiceWorker script="/sw-waiter.js" />
       <WaiterOfflineBanner />
       <WaiterInstallPrompt />
-      <div className="mx-auto min-h-[100dvh] w-full max-w-[var(--waiter-width)] bg-[#efefef] px-safe">
-        <StaffAuthGuard>{children}</StaffAuthGuard>
-      </div>
+      <WaiterStaffGate>
+        <div className="mx-auto min-h-[100dvh] w-full max-w-[var(--waiter-width)] bg-[var(--pos-bg)] px-safe">
+          {children}
+        </div>
+      </WaiterStaffGate>
     </div>
   );
 }

@@ -1,14 +1,9 @@
 #!/usr/bin/env node
 /**
- * .env の PUBLIC_BASE_URL を LAN IP + ポートに同期（iPhone PWA 用の固定URL）
+ * お店Wi-Fi用の LAN URL を表示するだけ。
+ * PUBLIC_BASE_URL には書かない（お客様QRは HTTPS トンネル側を使うため）。
  */
-import { readFile, writeFile } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const envPath = path.join(root, ".env");
+import os from "os";
 
 function getLanIp() {
   const nets = os.networkInterfaces();
@@ -21,35 +16,14 @@ function getLanIp() {
   return null;
 }
 
-async function main() {
-  const port = Number(process.env.PORT ?? 3001);
-  const ip = getLanIp();
-  if (!ip) {
-    console.error("LAN IP を取得できません。Wi‑Fi に接続してください。");
-    process.exit(1);
-  }
-
-  const baseUrl = `http://${ip}:${port}`;
-  let env = "";
-  try {
-    env = await readFile(envPath, "utf8");
-  } catch {
-    env = 'DATABASE_URL="file:./dev.db"\n';
-  }
-
-  const line = `PUBLIC_BASE_URL="${baseUrl}"`;
-  if (/^PUBLIC_BASE_URL=/m.test(env)) {
-    env = env.replace(/^PUBLIC_BASE_URL=.*$/m, line);
-  } else {
-    env = env.trimEnd() + `\n${line}\n`;
-  }
-
-  await writeFile(envPath, env);
-  console.log(`PUBLIC_BASE_URL → ${baseUrl}`);
-  return { baseUrl, port, ip };
+const port = Number(process.env.PORT ?? 3000);
+const ip = getLanIp();
+if (!ip) {
+  console.error("LAN IP を取得できません。お店のWi-Fiに接続してください。");
+  process.exit(1);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const baseUrl = `http://${ip}:${port}`;
+console.log(`ウェイター / キッチン（お店のWi-Fi）: ${baseUrl}`);
+console.log(`  ${baseUrl}/waiter`);
+console.log(`  ${baseUrl}/kitchen`);

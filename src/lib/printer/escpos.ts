@@ -54,6 +54,27 @@ export class EscPosBuilder {
     return this.raw([0x1d, 0x56, 0x42, 0x10]);
   }
 
+  /** 白黒反転（再発行バーなど） */
+  reverse(on: boolean): this {
+    return this.raw([0x1d, 0x42, on ? 1 : 0]);
+  }
+
+  /**
+   * QRコード（Model 2）。データは UTF-8。
+   * moduleSize: 1–16（80mm紙なら 6〜8 が見やすい）
+   */
+  qr(data: string, moduleSize = 6): this {
+    const payload = Buffer.from(data, "utf8");
+    const storeLen = payload.length + 3;
+    this.raw([0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]);
+    this.raw([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, Math.min(16, Math.max(1, moduleSize))]);
+    this.raw([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x31]);
+    this.raw([0x1d, 0x28, 0x6b, storeLen & 0xff, (storeLen >> 8) & 0xff, 0x31, 0x50, 0x30]);
+    this.raw(payload);
+    this.raw([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30]);
+    return this;
+  }
+
   /** キャッシュドロワーキック（ピン2） */
   kickDrawer(): this {
     return this.raw([0x1b, 0x70, 0x00, 0x32, 0xfa]);
@@ -83,4 +104,8 @@ export function padLine(left: string, right: string, cols = 48): string {
 
 export function hr(cols = 48): string {
   return "-".repeat(cols);
+}
+
+export function dashHr(cols = 48): string {
+  return "- ".repeat(Math.ceil(cols / 2)).slice(0, cols);
 }

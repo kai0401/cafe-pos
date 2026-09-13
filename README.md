@@ -17,11 +17,11 @@ npm run rollout:check     # 環境変数チェック（本番）
 |------|-----|
 | ウェイター | `https://<app>.vercel.app/waiter/tables` |
 | キッチン | `https://<app>.vercel.app/kitchen` |
-| 管理 | `https://<app>.vercel.app/admin/login` |
+| 管理 | `https://<app>.vercel.app/admin/dashboard` |
 | QRオーダー | `https://<app>.vercel.app/qr/...` |
 
 1. [Neon](https://neon.tech) で PostgreSQL を作成
-2. Vercel にデプロイ（`DATABASE_URL`, `PUBLIC_BASE_URL`, `ADMIN_PIN`, `STAFF_PIN` を設定）
+2. Vercel にデプロイ（`DATABASE_URL`, `PUBLIC_BASE_URL` を設定。ログインは廃止）
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fkai0401%2Fcafe-pos&project-name=cafe-pos&env=DATABASE_URL&envDescription=Neon%20PostgreSQL%20%E6%8E%A5%E7%B6%9A%E6%96%87%E5%AD%97%E5%88%97&envLink=https%3A%2F%2Fneon.tech&demo-title=cafe-pos&demo-description=%E5%96%B6%E6%A5%AD%E7%94%A8%20POS%20MVP)
 

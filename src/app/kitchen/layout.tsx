@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { POS_ACCENT } from "@/lib/pos-theme";
 import { RegisterServiceWorker } from "@/components/pwa/register-service-worker";
-import { StaffAuthGuard } from "@/components/pwa/staff-auth-guard";
 
 export const metadata: Metadata = {
   title: "キッチン",
@@ -23,14 +23,14 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#1c1917",
+  themeColor: POS_ACCENT,
 };
 
 export default function KitchenLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="kitchen-shell min-h-[100dvh] bg-stone-950 text-white">
       <RegisterServiceWorker script="/sw-kitchen.js" />
-      <StaffAuthGuard>{children}</StaffAuthGuard>
+      {children}
     </div>
   );
 }

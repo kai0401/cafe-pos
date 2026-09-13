@@ -93,15 +93,26 @@ export function formatOrderItemNote(note: string | null | undefined): string | n
   return label;
 }
 
+export type OrderModifierInput = {
+  id: string;
+  name: string;
+  /** false なら注記（伝票）のみ。課金行は作らない（ソフト味など） */
+  bill?: boolean;
+};
+
 export function buildOrderItemsWithModifiers(
   main: { id: string; quantity: number },
-  modifiers: { id: string; name: string }[],
+  modifiers: OrderModifierInput[],
 ): { productId: string; quantity: number; note?: string }[] {
-  const note = encodeModifierBundle(main.id, modifiers);
+  const note = encodeModifierBundle(
+    main.id,
+    modifiers.map((m) => ({ id: m.id, name: m.name })),
+  );
   const items: { productId: string; quantity: number; note?: string }[] = [
     { productId: main.id, quantity: main.quantity, note },
   ];
   for (const mod of modifiers) {
+    if (mod.bill === false) continue;
     items.push({ productId: mod.id, quantity: main.quantity, note });
   }
   return items;

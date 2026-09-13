@@ -18,15 +18,15 @@ console.log(`
     環境変数（必須）:
       DATABASE_URL     = postgresql://...（Neon）
       PUBLIC_BASE_URL  = https://あなたのアプリ.vercel.app
-      ADMIN_PIN        = 管理画面PIN（4桁以上推奨）
-      STAFF_PIN        = ウェイターPIN
 
     任意:
       STORES_API_KEY   = QRからのオンライン決済
       OPENAI_API_KEY   = レシートAI分類
 
+    ※ ログイン機能は廃止（URL を知っている人は誰でも操作できます）
+
 【3】デプロイ後の初期設定
-    1. https://<your-app>.vercel.app/admin/login でログイン
+    1. https://<your-app>.vercel.app/admin/dashboard を開く（ログイン不要）
     2. /admin/imports でスマレジ商品CSVをインポート
     3. /admin/settings で店舗名・STORES決済を設定
     4. /admin/qr でQRシールを印刷 → テーブルに貼付

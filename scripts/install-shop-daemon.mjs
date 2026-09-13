@@ -54,6 +54,8 @@ async function main() {
   <true/>
   <key>KeepAlive</key>
   <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
   <key>StandardOutPath</key>
   <string>${path.join(logDir, "shop-server.log")}</string>
   <key>StandardErrorPath</key>
@@ -62,6 +64,10 @@ async function main() {
   <dict>
     <key>PATH</key>
     <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    <key>PORT</key>
+    <string>3000</string>
+    <key>NODE_ENV</key>
+    <string>production</string>
   </dict>
 </dict>
 </plist>

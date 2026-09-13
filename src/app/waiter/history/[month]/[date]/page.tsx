@@ -5,8 +5,8 @@ import { useParams } from "next/navigation";
 import { ConfirmDialog, Toast, WaiterHeader } from "@/components/waiter/waiter-ui";
 import { formatYen, PAYMENT_LABELS } from "@/lib/format";
 import { waiterFetch } from "@/lib/waiter-api";
+import { POS_ACCENT } from "@/lib/pos-theme";
 
-const BLUE = "#007aff";
 
 type Tx = {
   id: string;
@@ -14,14 +14,18 @@ type Tx = {
   dataSource: string;
   transactionType: string;
   transactionAt: string;
+  entryTime: string | null;
   totalAmount: number;
   customerCount: number;
   tableNumber: number | null;
+  tableName: string | null;
   staffName: string | null;
+  customerSegment: string | null;
   payments: { method: string; amount: number }[];
   items: { name: string; quantity: number; totalAmount: number }[];
   refunded: boolean;
   canRefund: boolean;
+  openOrder?: boolean;
 };
 
 export default function HistoryDayDetailPage() {
@@ -90,8 +94,20 @@ export default function HistoryDayDetailPage() {
     return new Date(iso).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
   }
 
+  function dwellLabel(entryIso: string | null, checkoutIso: string) {
+    if (!entryIso) return null;
+    const mins = Math.max(
+      0,
+      Math.round((new Date(checkoutIso).getTime() - new Date(entryIso).getTime()) / 60000),
+    );
+    if (mins < 60) return `滞在 ${mins}分`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m > 0 ? `滞在 ${h}時間${m}分` : `滞在 ${h}時間`;
+  }
+
   return (
-    <div className="min-h-screen bg-[#efefef] pb-8">
+    <div className="min-h-screen bg-[var(--pos-bg)] pb-8">
       <WaiterHeader title={date} backHref={`/waiter/history/${month}`} onRefresh={() => void load()} />
 
       {pageLoading && (
@@ -106,7 +122,9 @@ export default function HistoryDayDetailPage() {
 
       {txs.map((tx) => {
         const isRefund = tx.transactionType === "REFUND";
+        const isOpenOrder = tx.openOrder || tx.transactionType === "ORDER";
         const open = expanded === tx.id;
+        const dwell = dwellLabel(tx.entryTime, tx.transactionAt);
         return (
           <div key={tx.id} className="border-b border-stone-200 bg-white">
             <button
@@ -121,15 +139,16 @@ export default function HistoryDayDetailPage() {
                   {tx.customerCount > 0 && ` · ${tx.customerCount}名`}
                 </p>
                 <p className="mt-0.5 text-[12px] text-stone-400">
-                  {tx.dataSource === "SMAREGI" ? "スマレジ" : "自前POS"}
+                  {isOpenOrder ? "未会計" : tx.dataSource === "SMAREGI" ? "スマレジ" : "会計済"}
                   {isRefund && <span className="ml-1 text-red-500">返金</span>}
                   {tx.refunded && <span className="ml-1 text-red-500">取消済</span>}
                   {tx.staffName && ` · ${tx.staffName}`}
+                  {tx.customerSegment && ` · ${tx.customerSegment}`}
                 </p>
               </div>
               <span
                 className={`shrink-0 text-[17px] font-bold tabular-nums ${tx.refunded ? "text-stone-300 line-through" : ""}`}
-                style={{ color: tx.refunded ? undefined : isRefund ? "#dc2626" : BLUE }}
+                style={{ color: tx.refunded ? undefined : isRefund ? "#dc2626" : POS_ACCENT }}
               >
                 {formatYen(tx.totalAmount)}
               </span>
@@ -150,6 +169,13 @@ export default function HistoryDayDetailPage() {
                 {tx.payments.length > 0 && (
                   <p className="mt-2 text-[12px] text-stone-400">
                     支払い: {tx.payments.map((p) => `${PAYMENT_LABELS[p.method] ?? p.method} ${formatYen(p.amount)}`).join(" / ")}
+                  </p>
+                )}
+                {(tx.entryTime || tx.customerSegment) && (
+                  <p className="mt-1 text-[12px] text-stone-400">
+                    {tx.entryTime && `入店 ${timeLabel(tx.entryTime)}`}
+                    {tx.entryTime && dwell && ` · ${dwell}`}
+                    {tx.customerSegment && ` · 客層 ${tx.customerSegment}`}
                   </p>
                 )}
                 {tx.canRefund && (
@@ -175,7 +201,11 @@ export default function HistoryDayDetailPage() {
           onCancel={() => setRefundTarget(null)}
         >
           <p className="text-[15px] text-stone-600">
-            {formatYen(refundTarget.totalAmount)} の返金取引を作成します。元の取引データは保持されます。
+            {formatYen(refundTarget.totalAmount)} の返金取引を POS
+            上に作成します。元の取引データは保持されます。
+          </p>
+          <p className="mt-3 text-[13px] text-[var(--pos-danger)]">
+            STORES / カード決済の場合は、端末側でも別途返金操作が必要です。先に端末で返金してから実行してください。
           </p>
         </ConfirmDialog>
       )}

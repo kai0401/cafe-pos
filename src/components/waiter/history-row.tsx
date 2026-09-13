@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { formatYen } from "@/lib/format";
+import { POS_ACCENT } from "@/lib/pos-theme";
 
-const BLUE = "#007aff";
-const BORDER = "#e0e0e0";
+const BORDER = "var(--pos-line)";
 
 function AmountBlock({
   count,
@@ -13,7 +13,7 @@ function AmountBlock({
   total: number;
   muted?: boolean;
 }) {
-  const color = muted ? "#a3a3a3" : BLUE;
+  const color = muted ? "#a8a29e" : POS_ACCENT;
   return (
     <div className="shrink-0 text-right" style={{ minWidth: "6.5rem" }}>
       <p className="text-[12px] leading-none" style={{ color }}>

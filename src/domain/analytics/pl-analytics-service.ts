@@ -166,17 +166,19 @@ export async function getProfitLossTrend(storeId: string, months = 6) {
     ? getJstYearMonth(lastSummary.businessDate)
     : getCurrentJstYearMonth();
 
-  const results: ProfitLossPeriod[] = [];
-
-  for (let i = months - 1; i >= 0; i--) {
+  const periods = Array.from({ length: months }, (_, index) => {
+    const i = months - 1 - index;
     const d = new Date(Date.UTC(anchor.year, anchor.month - 1 - i, 1));
     const y = d.getUTCFullYear();
     const m = d.getUTCMonth() + 1;
-    const { start, end, label } = monthRange(y, m);
-    results.push(await getProfitLossForPeriod(storeId, start, end, label));
-  }
+    return monthRange(y, m);
+  });
 
-  return results;
+  return Promise.all(
+    periods.map((period) =>
+      getProfitLossForPeriod(storeId, period.start, period.end, period.label),
+    ),
+  );
 }
 
 export type DashboardBundle = {

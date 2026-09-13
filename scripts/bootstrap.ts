@@ -23,7 +23,7 @@ async function main() {
 
   console.log("\nBootstrap complete.");
   console.log("Next steps:");
-  console.log("  1. Set ADMIN_PIN, STAFF_PIN and PUBLIC_BASE_URL for production");
+  console.log("  1. Set PUBLIC_BASE_URL for production");
   console.log("  2. Import Smaregi CSV at /admin/imports");
   console.log("  3. Print QR seals at /admin/qr");
   console.log("  4. Open /waiter on iPhone and /kitchen on iPad");

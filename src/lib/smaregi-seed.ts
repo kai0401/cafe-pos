@@ -37,7 +37,7 @@ export async function importSmaregiCsvFiles(paths: SmaregiCsvPaths) {
   const store = await getDefaultStore();
   await prisma.store.update({
     where: { id: store.id },
-    data: { name: "喫茶店" },
+    data: { name: "あづま家" },
   });
 
   for (const [filePath, fileType] of [

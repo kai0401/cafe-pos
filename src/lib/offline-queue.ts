@@ -26,16 +26,28 @@ export type OfflineAction = {
   action?: "send" | "addAndSend";
   orderId?: string;
   queuedAt?: number;
+  idempotencyKey?: string;
 };
 
 const QUEUE_KEY = "waiter-sync-queue";
 const MAX_FLUSH_ITEMS = 5;
 const FLUSH_TIMEOUT_MS = 8_000;
 
+function newIdempotencyKey() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `offline-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function queueOfflineAction(action: OfflineAction) {
   if (typeof window === "undefined") return;
   const queue = JSON.parse(localStorage.getItem(QUEUE_KEY) ?? "[]") as OfflineAction[];
-  queue.push({ ...action, queuedAt: Date.now() });
+  queue.push({
+    ...action,
+    queuedAt: Date.now(),
+    idempotencyKey: action.idempotencyKey ?? newIdempotencyKey(),
+  });
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
 }
 
@@ -68,12 +80,18 @@ export async function flushOfflineQueue(): Promise<{ synced: number; remaining: 
 
   for (const action of batch) {
     try {
+      const idempotencyKey = action.idempotencyKey ?? newIdempotencyKey();
       const body =
         action.action === "addAndSend"
-          ? { action: "addAndSend", tableId: action.tableId, items: action.items }
+          ? {
+              action: "addAndSend",
+              tableId: action.tableId,
+              items: action.items,
+              idempotencyKey,
+            }
           : action.action === "send"
-            ? { action: "send", orderId: action.orderId }
-            : { tableId: action.tableId, items: action.items };
+            ? { action: "send", orderId: action.orderId, idempotencyKey }
+            : { tableId: action.tableId, items: action.items, idempotencyKey };
 
       const res = await fetchWithTimeout(
         "/api/waiter/orders",
@@ -85,7 +103,7 @@ export async function flushOfflineQueue(): Promise<{ synced: number; remaining: 
         },
         FLUSH_TIMEOUT_MS,
       );
-      if (!res.ok) remaining.push(action);
+      if (!res.ok) remaining.push({ ...action, idempotencyKey });
       else synced += 1;
     } catch {
       remaining.push(action);

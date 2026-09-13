@@ -12,6 +12,7 @@ export const SMAREGI_DEPT_TO_CATEGORY: Record<string, string> = {
 export const WAITER_CATEGORY_ORDER = [
   "あんみつ",
   "ソフトクリーム",
+  "テイクアウト",
   "ドリンク",
   "氷",
   "シロップ",
@@ -21,11 +22,11 @@ export const WAITER_CATEGORY_ORDER = [
 export type WaiterCategoryName = (typeof WAITER_CATEGORY_ORDER)[number];
 
 export function resolveCategoryName(deptId: string, productName: string): string {
+  if (productName.includes("テイクアウト")) {
+    return "テイクアウト";
+  }
   if (SMAREGI_DEPT_TO_CATEGORY[deptId]) {
     return SMAREGI_DEPT_TO_CATEGORY[deptId]!;
-  }
-  if (productName.includes("テイクアウト") && productName.includes("ソフト")) {
-    return "ソフトクリーム";
   }
   if (productName.includes("ナポリタン") || productName.includes("オムライス")) {
     return "軽食";

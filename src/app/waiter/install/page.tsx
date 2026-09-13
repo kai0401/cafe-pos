@@ -7,15 +7,15 @@ import {
   isInAppBrowser,
   isStandalone,
 } from "@/lib/pwa-install";
+import { POS_ACCENT } from "@/lib/pos-theme";
 
-const ORANGE = "#e8912d";
 
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-4 border-b border-stone-100 py-5 last:border-b-0">
       <span
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[15px] font-bold text-white"
-        style={{ backgroundColor: ORANGE }}
+        style={{ backgroundColor: POS_ACCENT }}
       >
         {n}
       </span>
@@ -39,10 +39,10 @@ export default function WaiterInstallPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#efefef] pb-8">
+    <div className="min-h-screen bg-[var(--pos-bg)] pb-8">
       <header
         className="waiter-top-bar sticky top-0 z-20 flex shrink-0 items-center px-3 text-white"
-        style={{ backgroundColor: ORANGE }}
+        style={{ backgroundColor: POS_ACCENT }}
       >
         <Link href="/waiter" className="waiter-header-btn min-w-[72px] text-[15px]">
           ‹ 戻る
@@ -73,7 +73,7 @@ export default function WaiterInstallPage() {
         )}
 
         {inApp && !installed && (
-          <div className="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-[14px] leading-relaxed text-amber-900">
+          <div className="mt-5 rounded-xl bg-[var(--pos-accent-soft)] px-4 py-3 text-[14px] leading-relaxed text-[var(--pos-accent-press)]">
             <strong>重要:</strong> 今はアプリ内ブラウザです。先に
             <strong>「Safariで開く」</strong>
             （画面下のメニュー）をタップしてください。
@@ -154,7 +154,7 @@ export default function WaiterInstallPage() {
           <Link
             href="/waiter/tables"
             className="flex w-full items-center justify-center rounded-xl py-4 text-[16px] font-semibold text-white"
-            style={{ backgroundColor: ORANGE }}
+            style={{ backgroundColor: POS_ACCENT }}
           >
             ブラウザのまま使う
           </Link>

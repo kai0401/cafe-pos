@@ -10,8 +10,8 @@ import {
   isInstallDismissed,
   isStandalone,
 } from "@/lib/pwa-install";
+import { POS_ACCENT } from "@/lib/pos-theme";
 
-const ORANGE = "#e8912d";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -29,6 +29,7 @@ export function WaiterInstallPrompt() {
     if (isStandalone()) return;
     if (pathname === "/waiter/install" || pathname === "/waiter/connect" || pathname === "/waiter/open") return;
     if (pathname === "/waiter/tables") return;
+    if (pathname.startsWith("/waiter/history") || pathname.startsWith("/waiter/order")) return;
     if (isInstallDismissed()) return;
 
     setInApp(isInAppBrowser());
@@ -72,7 +73,7 @@ export function WaiterInstallPrompt() {
               type="button"
               onClick={close}
               className="mt-5 w-full rounded-xl py-3.5 text-[16px] font-semibold text-white"
-              style={{ backgroundColor: ORANGE }}
+              style={{ backgroundColor: POS_ACCENT }}
             >
               わかりました
             </button>
@@ -100,7 +101,7 @@ export function WaiterInstallPrompt() {
                 type="button"
                 onClick={() => void installAndroid()}
                 className="mt-5 w-full rounded-xl py-3.5 text-[16px] font-semibold text-white"
-                style={{ backgroundColor: ORANGE }}
+                style={{ backgroundColor: POS_ACCENT }}
               >
                 アプリをインストール
               </button>
@@ -108,7 +109,7 @@ export function WaiterInstallPrompt() {
               <Link
                 href="/waiter/install"
                 className="mt-5 flex w-full items-center justify-center rounded-xl py-3.5 text-[16px] font-semibold text-white"
-                style={{ backgroundColor: ORANGE }}
+                style={{ backgroundColor: POS_ACCENT }}
                 onClick={close}
               >
                 追加手順を見る

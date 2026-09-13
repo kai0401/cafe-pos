@@ -1,13 +1,49 @@
 import { NextResponse } from "next/server";
 import {
   confirmStoresTerminalPayment,
-  finalizeStoresPayment,
   syncStoresOnlinePayment,
 } from "@/domain/payment/stores-payment-service";
 import { prisma } from "@/lib/prisma";
 
+function publicSessionPayload(session: {
+  id: string;
+  status: string;
+  amount: number;
+  discountAmount: number;
+  paymentMethod: string | null;
+  paymentUrl: string | null;
+  paidAt: Date | null;
+  order: {
+    id: string;
+    table: { id: string; qrToken: string | null } | null;
+  } | null;
+}) {
+  const table = session.order?.table;
+  const returnUrl =
+    table?.id && table.qrToken ? `/qr/${table.id}?t=${table.qrToken}` : null;
+
+  return {
+    session: {
+      id: session.id,
+      status: session.status,
+      amount: session.amount,
+      discountAmount: session.discountAmount,
+      paymentMethod: session.paymentMethod,
+      paymentUrl: session.paymentUrl,
+      paidAt: session.paidAt,
+      order: session.order
+        ? {
+            id: session.order.id,
+            table: table ? { id: table.id } : null,
+          }
+        : null,
+    },
+    returnUrl,
+  };
+}
+
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ sessionId: string }> },
 ) {
   try {
@@ -37,13 +73,7 @@ export async function GET(
       });
     }
 
-    return NextResponse.json({
-      session,
-      returnUrl:
-        session.order?.table?.id && session.order.table.qrToken
-          ? `/qr/${session.order.table.id}?t=${session.order.table.qrToken}`
-          : null,
-    });
+    return NextResponse.json(publicSessionPayload(session));
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "取得エラー" },

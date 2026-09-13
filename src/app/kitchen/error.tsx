@@ -14,7 +14,7 @@ export default function KitchenError({
       <button
         type="button"
         onClick={reset}
-        className="mt-6 rounded-lg bg-amber-500 px-6 py-2.5 font-semibold text-stone-900"
+        className="mt-6 rounded-lg bg-[var(--pos-accent)] px-6 py-2.5 font-semibold text-white"
       >
         再読み込み
       </button>

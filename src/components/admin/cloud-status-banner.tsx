@@ -37,16 +37,19 @@ export function CloudStatusBanner() {
   const needsProducts = setup && setup.tables >= 9 && setup.products === 0;
 
   return (
-    <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4">
+    <div className="admin-card mb-6 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-semibold text-emerald-900">クラウド稼働中 — 店舗PC不要</p>
-          <p className="mt-1 text-sm text-emerald-800">
+          <p className="flex items-center gap-2 font-medium text-[var(--admin-ink)]">
+            <span className="admin-tag admin-tag--sage">クラウド稼働中</span>
+            店舗PC不要
+          </p>
+          <p className="mt-1.5 text-sm leading-relaxed text-[var(--admin-muted)]">
             ウェイター・キッチン・QRオーダーはインターネット経由で常時利用できます。
             キッチン伝票は画面表示、レシートはSTORES端末をご利用ください。
           </p>
           {setup && !setup.ready && (
-            <p className="mt-2 text-sm text-amber-800">
+            <p className="mt-2 text-sm font-medium text-[var(--admin-vermillion)]">
               {needsProducts
                 ? `テーブル ${setup.tables} 席準備済み — 商品CSVのインポートが必要です`
                 : `セットアップ未完了（テーブル ${setup.tables} / 商品 ${setup.products}）`}
@@ -59,23 +62,17 @@ export function CloudStatusBanner() {
               type="button"
               disabled={initing}
               onClick={() => void runSetup()}
-              className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="admin-btn admin-btn--accent"
             >
               {initing ? "準備中…" : "テーブル初期化"}
             </button>
           )}
           {needsProducts && (
-            <Link
-              href="/admin/imports"
-              className="rounded-lg border border-emerald-700 px-3 py-2 text-sm font-medium text-emerald-900"
-            >
+            <Link href="/admin/imports" className="admin-btn admin-btn--ghost">
               商品CSVインポート
             </Link>
           )}
-          <Link
-            href="/admin/qr"
-            className="rounded-lg border border-emerald-700 px-3 py-2 text-sm font-medium text-emerald-900"
-          >
+          <Link href="/admin/qr" className="admin-btn admin-btn--ghost">
             QRシール印刷
           </Link>
         </div>

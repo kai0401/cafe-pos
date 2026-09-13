@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Toast } from "@/components/waiter/waiter-ui";
-import { loadStaffSuggestions, saveStaffToHistory } from "@/lib/waiter-staff";
+import { loadStaffSuggestions, getCurrentStaffName, setCurrentStaffName } from "@/lib/waiter-staff";
 import { waiterFetch } from "@/lib/waiter-api";
 
-const ORANGE = "#e8912d";
-const BLUE = "#1665d8";
+import { POS_ACCENT } from "@/lib/pos-theme";
+
 const SEGMENTS = ["家族連れ", "20代", "30代", "40代", "50代〜", "外国人観光客"];
 
 export default function EntryPage() {
@@ -29,7 +29,7 @@ export default function EntryPage() {
   const [eatInType, setEatInType] = useState<"DINE_IN" | "TAKEOUT">("DINE_IN");
 
   useEffect(() => {
-    waiterFetch(`/api/waiter/tables/${tableId}`, { redirectOn401: false })
+    waiterFetch(`/api/waiter/tables/${tableId}`)
       .then((r) => r.json())
       .then((data) => {
         if (data?.name) setTableName(data.name);
@@ -38,7 +38,9 @@ export default function EntryPage() {
       .catch(() => setToast("テーブル情報の読み込みに失敗しました"));
     loadStaffSuggestions().then((names) => {
       setStaffSuggestions(names);
-      if (names[0]) setStaff(names[0]);
+      const current = getCurrentStaffName();
+      if (current) setStaff(current);
+      else if (names[0]) setStaff(names[0]);
     });
   }, [tableId]);
 
@@ -47,7 +49,7 @@ export default function EntryPage() {
     setStaff(trimmed);
     setStaffOpen(false);
     if (!trimmed) return;
-    saveStaffToHistory(trimmed);
+    setCurrentStaffName(trimmed);
     setStaffSuggestions((prev) => [trimmed, ...prev.filter((s) => s !== trimmed)].slice(0, 8));
   }
 
@@ -97,10 +99,10 @@ export default function EntryPage() {
     "flex items-center justify-center border-b border-r border-stone-200 bg-white py-3.5 text-[19px] active:bg-stone-100";
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#efefef]">
+    <div className="flex min-h-screen flex-col bg-[var(--pos-bg)]">
       <header
         className="waiter-top-bar sticky top-0 z-20 flex shrink-0 items-center px-3 text-white"
-        style={{ backgroundColor: ORANGE }}
+        style={{ backgroundColor: POS_ACCENT }}
       >
         <div className="min-w-[72px]" />
         <h1 className="flex-1 text-center text-[16px] font-semibold">
@@ -128,7 +130,7 @@ export default function EntryPage() {
               setCount(n);
               setMoreOpen(false);
             }}
-            className={`${cellBase} ${count === n && !moreOpen ? "!bg-[#e8912d] font-bold !text-white" : "text-stone-900"}`}
+            className={`${cellBase} ${count === n && !moreOpen ? "!bg-[var(--pos-accent)] font-bold !text-white" : "text-stone-900"}`}
           >
             {n}
             <span className="mt-1 text-[11px]">人</span>
@@ -140,7 +142,7 @@ export default function EntryPage() {
             setMoreOpen(true);
             setCount(Number(moreValue) || 10);
           }}
-          className={`${cellBase} !text-[14px] ${moreOpen ? "!bg-[#e8912d] font-bold !text-white" : "text-stone-900"}`}
+          className={`${cellBase} !text-[14px] ${moreOpen ? "!bg-[var(--pos-accent)] font-bold !text-white" : "text-stone-900"}`}
         >
           それ以上
         </button>
@@ -169,7 +171,7 @@ export default function EntryPage() {
             key={seg}
             type="button"
             onClick={() => setSegment((prev) => (prev === seg ? null : seg))}
-            className={`${cellBase} !text-[15px] ${segment === seg ? "!bg-[#e8912d] font-bold !text-white" : "text-stone-900"}`}
+            className={`${cellBase} !text-[15px] ${segment === seg ? "!bg-[var(--pos-accent)] font-bold !text-white" : "text-stone-900"}`}
           >
             {seg}
           </button>
@@ -195,7 +197,7 @@ export default function EntryPage() {
 
       <div
         className="waiter-fixed-bottom pb-safe z-30 flex"
-        style={{ backgroundColor: BLUE }}
+        style={{ backgroundColor: POS_ACCENT }}
       >
         <button
           type="button"
@@ -227,7 +229,7 @@ export default function EntryPage() {
                     key={name}
                     type="button"
                     onClick={() => saveStaffName(name)}
-                    className="rounded-full border border-stone-300 px-3.5 py-2.5 text-[14px] text-stone-700 active:bg-amber-50"
+                    className="rounded-full border border-stone-300 px-3.5 py-2.5 text-[14px] text-stone-700 active:bg-[var(--pos-accent-soft)]"
                   >
                     {name}
                   </button>
@@ -251,7 +253,7 @@ export default function EntryPage() {
               <button
                 type="button"
                 onClick={() => saveStaffName(staffDraft)}
-                className="flex-1 rounded-lg bg-[#e8912d] py-2.5 text-[15px] font-semibold text-white"
+                className="flex-1 rounded-lg bg-[var(--pos-accent)] py-2.5 text-[15px] font-semibold text-white"
               >
                 決定
               </button>

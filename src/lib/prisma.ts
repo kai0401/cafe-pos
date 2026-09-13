@@ -43,7 +43,7 @@ export async function getDefaultStore() {
 
   return prisma.store.create({
     data: {
-      name: "喫茶店",
+      name: "あづま家",
       openTime: "11:00",
       closeTime: "18:00",
       regularClosedDays: [3],

@@ -1,4 +1,4 @@
 import { waiterFetch } from "./waiter-api";
 
-/** キッチン画面用 — スタッフ Cookie を含めて API を呼ぶ */
+/** キッチン画面用の API フェッチ（タイムアウト付き） */
 export const kitchenFetch = waiterFetch;

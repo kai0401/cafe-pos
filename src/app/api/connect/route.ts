@@ -1,38 +1,46 @@
 import { NextResponse } from "next/server";
 import { buildLanBaseUrl, getLanIp } from "@/lib/lan-ip";
-import { getPublicBaseUrlAsync, isBaseUrlFixed } from "@/lib/public-base-url";
+import {
+  getPublicBaseUrlAsync,
+  getStaffBaseUrl,
+  isBaseUrlFixed,
+  isCustomerUrlReachableFromLte,
+} from "@/lib/public-base-url";
 import { getRemoteUrlInfo } from "@/lib/remote-url";
 import { isCloudRuntime } from "@/lib/runtime-config";
 
 export async function GET(request: Request) {
-  const host = request.headers.get("host") ?? "localhost:3000";
-  const port = Number(host.split(":")[1] ?? 3000);
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "localhost:3000";
+  const port = Number((host.split(",")[0] ?? "").split(":")[1] ?? process.env.PORT ?? 3000);
   const cloud = isCloudRuntime();
   const lanIp = cloud ? null : getLanIp();
   const remote = cloud ? null : await getRemoteUrlInfo();
   const lanUrl = cloud ? null : buildLanBaseUrl(port) ?? (lanIp ? `http://${lanIp}:${port}` : null);
-  const base = await getPublicBaseUrlAsync(port, host);
+  const publicUrl = await getPublicBaseUrlAsync(port, host.split(",")[0]?.trim());
+  const staffUrl = cloud ? publicUrl : getStaffBaseUrl(port);
 
   return NextResponse.json({
     cloud,
-    mode: cloud ? "cloud" : remote?.url ? "tunnel" : lanIp ? "lan" : "local",
+    mode: cloud ? "cloud" : remote?.url ? "hybrid" : lanIp ? "lan" : "local",
     lanIp,
     port,
-    baseUrl: base,
+    baseUrl: publicUrl,
     lanUrl,
     remoteUrl: remote?.url ?? null,
     remoteUpdatedAt: remote?.updatedAt ?? null,
     remoteActive: Boolean(remote?.url),
     shopServerRequired: !cloud,
-    baseUrlFixed: isBaseUrlFixed() || Boolean(remote?.url),
-    waiterUrl: `${base}/waiter`,
-    tablesUrl: `${base}/waiter/tables`,
-    kitchenUrl: `${base}/kitchen`,
-    kitchenOpenUrl: `${base}/kitchen/open`,
-    kitchenInstallUrl: `${base}/kitchen/install`,
-    kitchenConnectUrl: `${base}/kitchen/connect`,
-    connectUrl: `${base}/waiter/connect`,
-    qrBaseUrl: `${base}/qr`,
+    baseUrlFixed: isBaseUrlFixed() || isCustomerUrlReachableFromLte(publicUrl),
+    lteReady: cloud || isCustomerUrlReachableFromLte(publicUrl),
+    waiterUrl: `${staffUrl}/waiter`,
+    tablesUrl: `${staffUrl}/waiter/tables`,
+    kitchenUrl: `${staffUrl}/kitchen`,
+    kitchenOpenUrl: `${staffUrl}/kitchen/open`,
+    kitchenInstallUrl: `${staffUrl}/kitchen/install`,
+    kitchenConnectUrl: `${staffUrl}/kitchen/connect`,
+    connectUrl: `${staffUrl}/waiter/connect`,
+    adminUrl: `${publicUrl}/admin`,
+    qrBaseUrl: `${publicUrl}/qr`,
     isLan: Boolean(lanIp),
   });
 }

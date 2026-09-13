@@ -7,12 +7,12 @@ import { ConfirmDialog, Toast } from "@/components/waiter/waiter-ui";
 import { formatYen, PAYMENT_LABELS } from "@/lib/format";
 import { flushOfflineQueue } from "@/lib/offline-queue";
 import { waiterFetch } from "@/lib/waiter-api";
-import { groupOrderItemsForDisplay, isModifierChildLine, countDisplayOrderItems } from "@/lib/order-modifiers";
+import { groupOrderItemsForDisplay, isModifierChildLine } from "@/lib/order-modifiers";
 import { loadWaiterOrderSettings } from "@/lib/waiter-order-settings";
 import { loadStaffSuggestions, saveStaffToHistory } from "@/lib/waiter-staff";
 
-const ORANGE = "#e8912d";
-const BLUE = "#2b6cb0";
+import { POS_ACCENT } from "@/lib/pos-theme";
+
 
 const PAYMENT_METHODS = ["CASH", "CREDIT_CARD", "TRANSIT_IC", "QR", "STORES"] as const;
 type PaymentMethod = (typeof PAYMENT_METHODS)[number];
@@ -60,10 +60,10 @@ function elapsedLabel(iso: string, now: number = Date.now()) {
 }
 
 const STATUS_CHIP: Record<string, { label: string; className: string }> = {
-  PENDING: { label: "未送信", className: "bg-red-50 text-red-600 border-red-200" },
-  SENT: { label: "キッチン送信済", className: "bg-blue-50 text-blue-600 border-blue-200" },
-  COOKING: { label: "調理中", className: "bg-amber-50 text-amber-700 border-amber-200" },
-  DONE: { label: "調理完了", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  PENDING: { label: "未送信", className: "bg-red-50 text-[var(--pos-danger)] border-red-200" },
+  SENT: { label: "キッチン送信済", className: "bg-stone-100 text-stone-600 border-stone-200" },
+  COOKING: { label: "調理中", className: "bg-[var(--pos-accent-soft)] text-[var(--pos-accent-press)] border-[var(--pos-accent)]/30" },
+  DONE: { label: "調理完了", className: "bg-emerald-50 text-[var(--pos-success)] border-emerald-200" },
   SERVED: { label: "提供済", className: "bg-stone-100 text-stone-500 border-stone-200" },
   CANCELLED: { label: "取消", className: "bg-stone-100 text-stone-400 border-stone-200" },
 };
@@ -78,6 +78,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [orderLoadError, setOrderLoadError] = useState("");
   const [now, setNow] = useState(Date.now());
 
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -101,14 +102,33 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
   const [cancelItemTarget, setCancelItemTarget] = useState<{ id: string; name: string } | null>(
     null,
   );
+  const [guestUpdating, setGuestUpdating] = useState(false);
+  const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  const [tableOps, setTableOps] = useState<
+    null | "menu" | "move" | "split-items" | "split-table" | "merge"
+  >(null);
+  const [tableChoices, setTableChoices] = useState<
+    {
+      id: string;
+      name: string;
+      orderId: string | null;
+      itemCount: number;
+      totalAmount: number;
+      eatInType: string;
+    }[]
+  >([]);
+  const [splitSelected, setSplitSelected] = useState<Set<string>>(new Set());
+  const [tableOpsLoading, setTableOpsLoading] = useState(false);
 
   const eatInType = table?.eatInType === "TAKEOUT" ? "TAKEOUT" : "DINE_IN";
   const titlePrefix = eatInType === "TAKEOUT" ? "テイクアウト" : "イートイン";
 
   const totals = useMemo(() => {
     const items = order?.items ?? [];
-    const count = countDisplayOrderItems(items);
-    const amount = items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+    const displayItems = groupOrderItemsForDisplay(items);
+    const count = displayItems.reduce((s, i) => s + i.quantity, 0);
+    // 本体のないトッピング行（孤児）は合計に入れない
+    const amount = displayItems.reduce((s, i) => s + i.lineTotal, 0);
     const pending = items.filter(
       (i) => i.status === "PENDING" && !isModifierChildLine(i.productId, i.note),
     );
@@ -116,28 +136,48 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
     const inKitchenCount = items
       .filter(
         (i) =>
-          ["SENT", "COOKING", "DONE"].includes(i.status) &&
+          ["SENT", "COOKING"].includes(i.status) &&
           !isModifierChildLine(i.productId, i.note),
       )
       .reduce((s, i) => s + i.quantity, 0);
     return { count, amount, pendingCount, inKitchenCount };
   }, [order]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { includeTable?: boolean }) => {
+    const includeTable = opts?.includeTable !== false;
     setLoadError("");
+    setOrderLoadError("");
     void flushOfflineQueue();
     try {
-      const [tableRes, orderRes] = await Promise.all([
-        waiterFetch(`/api/waiter/tables/${tableId}`, { redirectOn401: false }),
-        waiterFetch(`/api/waiter/orders?tableId=${tableId}`, { redirectOn401: false }),
-      ]);
-      const tableData = await tableRes.json();
-      if (!tableRes.ok) {
-        setLoadError(tableData.error ?? "テーブル情報の読み込みに失敗しました");
+      if (includeTable) {
+        const [tableRes, orderRes] = await Promise.all([
+          waiterFetch(`/api/waiter/tables/${tableId}`),
+          waiterFetch(`/api/waiter/orders?tableId=${tableId}`),
+        ]);
+        const tableData = await tableRes.json();
+        if (!tableRes.ok) {
+          setLoadError(tableData.error ?? "テーブル情報の読み込みに失敗しました");
+          return;
+        }
+        setTable(tableData);
+        const orderData = await orderRes.json();
+        if (!orderRes.ok) {
+          setOrder(null);
+          setOrderLoadError(orderData.error ?? "注文情報の読み込みに失敗しました");
+          return;
+        }
+        setOrder(orderData?.id ? orderData : null);
         return;
       }
-      setTable(tableData);
+
+      const orderRes = await waiterFetch(`/api/waiter/orders?tableId=${tableId}`, {
+      });
       const orderData = await orderRes.json();
+      if (!orderRes.ok) {
+        setOrderLoadError(orderData.error ?? "注文情報の読み込みに失敗しました");
+        return;
+      }
+      setOrderLoadError("");
       setOrder(orderData?.id ? orderData : null);
     } catch {
       setLoadError("サーバーに接続できません");
@@ -145,9 +185,23 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
   }, [tableId]);
 
   useEffect(() => {
-    load();
-    const poll = setInterval(load, 8000);
-    return () => clearInterval(poll);
+    void load({ includeTable: true });
+    const poll = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      void load({ includeTable: false });
+    }, 12000);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void load({ includeTable: false });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [load]);
 
   useEffect(() => {
@@ -163,17 +217,22 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
   }, [searchParams]);
 
   async function updateGuests(delta: number) {
-    if (!order) return;
+    if (!order || guestUpdating) return;
     const next = Math.max(1, Math.min(20, order.customerCount + delta));
-    const res = await waiterFetch("/api/waiter/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "updateGuests", tableId, customerCount: next }),
-    });
-    if (res.ok) setOrder(await res.json());
-    else {
-      const data = await res.json();
-      setToast(data.error ?? "人数の更新に失敗しました");
+    setGuestUpdating(true);
+    try {
+      const res = await waiterFetch("/api/waiter/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateGuests", tableId, customerCount: next }),
+      });
+      if (res.ok) setOrder(await res.json());
+      else {
+        const data = await res.json();
+        setToast(data.error ?? "人数の更新に失敗しました");
+      }
+    } finally {
+      setGuestUpdating(false);
     }
   }
 
@@ -318,12 +377,8 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
   }
 
   function openCheckout() {
-    if (totals.pendingCount > 0) {
-      setToast("未送信の注文があります。先にキッチンへ送信してください");
-      return;
-    }
     if (totals.inKitchenCount > 0) {
-      setToast("調理中または未提供の注文があります。提供完了後に会計してください");
+      setToast("調理中の注文があります。調理完了後に会計してください");
       return;
     }
     if (totals.count === 0) {
@@ -337,12 +392,140 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
   }
 
   function requestUpdateQty(itemId: string, quantity: number, productName: string) {
-    if (quantity <= 0 && loadWaiterOrderSettings().confirmBeforeCancel) {
+    if (quantity <= 0) {
       setCancelItemTarget({ id: itemId, name: productName });
       return;
     }
     void updateItemQty(itemId, quantity);
   }
+
+  async function loadTableChoices(mode: "move" | "split-table" | "merge") {
+    const res = await waiterFetch("/api/waiter/tables");
+    const tables = await res.json();
+    if (!res.ok || !Array.isArray(tables)) {
+      setToast(tables?.error ?? "テーブル一覧の取得に失敗しました");
+      return;
+    }
+    // T1〜T9 を常に全部表示。テイクアウト 1/2/3 は出さない
+    const filtered = tables
+      .filter(
+        (t: {
+          id: string;
+          orderId: string | null;
+          eatInType?: string;
+          name?: string;
+          number?: number;
+        }) => t.eatInType === "DINE_IN" || /^T[1-9]$/i.test(String(t.name ?? "")),
+      )
+      .sort(
+        (a: { number?: number; name?: string }, b: { number?: number; name?: string }) =>
+          (a.number ?? 0) - (b.number ?? 0) ||
+          String(a.name ?? "").localeCompare(String(b.name ?? ""), "ja"),
+      );
+    setTableChoices(filtered);
+    const selectable = filtered.filter(
+      (t: { id: string; orderId: string | null }) => {
+        if (t.id === tableId) return false;
+        return mode === "merge" ? Boolean(t.orderId) : !t.orderId;
+      },
+    );
+    if (selectable.length === 0) {
+      setToast(
+        mode === "merge" ? "結合できるテーブルがありません" : "空いているテーブルがありません",
+      );
+    }
+  }
+
+  async function openTableOp(mode: "move" | "split-items" | "merge") {
+    if (!order) {
+      setToast("注文がありません");
+      return;
+    }
+    if (mode === "split-items") {
+      setSplitSelected(new Set());
+      setTableOps("split-items");
+      return;
+    }
+    setTableOps(mode === "move" ? "move" : "merge");
+    await loadTableChoices(mode === "move" ? "move" : "merge");
+  }
+
+  async function confirmMove(targetTableId: string) {
+    if (!order || tableOpsLoading) return;
+    setTableOpsLoading(true);
+    try {
+      const res = await waiterFetch("/api/waiter/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "moveTable", orderId: order.id, targetTableId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setToast(data.error ?? "移動に失敗しました");
+        return;
+      }
+      setTableOps(null);
+      setToast("テーブルを移動しました");
+      router.replace(`/waiter/order/${targetTableId}`);
+    } finally {
+      setTableOpsLoading(false);
+    }
+  }
+
+  async function confirmSplit(targetTableId: string) {
+    if (!order || tableOpsLoading || splitSelected.size === 0) return;
+    setTableOpsLoading(true);
+    try {
+      const res = await waiterFetch("/api/waiter/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "splitTable",
+          orderId: order.id,
+          targetTableId,
+          itemIds: [...splitSelected],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setToast(data.error ?? "分割に失敗しました");
+        return;
+      }
+      setTableOps(null);
+      setSplitSelected(new Set());
+      setToast("テーブルを分割しました");
+      await load({ includeTable: true });
+    } finally {
+      setTableOpsLoading(false);
+    }
+  }
+
+  async function confirmMerge(sourceOrderId: string) {
+    if (!order || tableOpsLoading) return;
+    setTableOpsLoading(true);
+    try {
+      const res = await waiterFetch("/api/waiter/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mergeTable", orderId: order.id, sourceOrderId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setToast(data.error ?? "結合に失敗しました");
+        return;
+      }
+      setOrder(data);
+      setTableOps(null);
+      setToast("テーブルを結合しました");
+    } finally {
+      setTableOpsLoading(false);
+    }
+  }
+
+  const splitCandidates = useMemo(
+    () => groupOrderItemsForDisplay(order?.items ?? []),
+    [order],
+  );
 
   async function updateMeta(patch: { staffName?: string; customerSegment?: string }) {
     if (!order) return;
@@ -373,6 +556,8 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
   }
 
   async function serveItem(itemId: string) {
+    if (busyItemId) return;
+    setBusyItemId(itemId);
     setLoading(true);
     try {
       const res = await waiterFetch("/api/waiter/orders", {
@@ -386,11 +571,14 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
         setToast(data.error ?? "提供の更新に失敗しました");
       }
     } finally {
+      setBusyItemId(null);
       setLoading(false);
     }
   }
 
   async function updateItemQty(itemId: string, quantity: number) {
+    if (busyItemId) return;
+    setBusyItemId(itemId);
     setLoading(true);
     try {
       const res = await waiterFetch("/api/waiter/orders", {
@@ -398,13 +586,18 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "updateQty", tableId, itemId, quantity }),
       });
-      if (res.ok) setOrder(await res.json());
-      else {
+      if (res.ok) {
+        const next = await res.json();
+        setOrder(next);
+        if (quantity <= 0) setToast("商品を取消しました");
+      } else {
         const data = await res.json();
         setToast(data.error ?? "更新に失敗しました");
       }
     } finally {
+      setBusyItemId(null);
       setLoading(false);
+      setCancelItemTarget(null);
     }
   }
 
@@ -433,7 +626,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
           `<tr><td>${item.productName}${item.quantity > 1 ? ` ×${item.quantity}` : ""}</td><td style="text-align:right">${formatYen(item.unitPrice * item.quantity)}</td></tr>`,
       )
       .join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>レシート</title></head><body style="font-family:sans-serif;padding:24px"><h1>喫茶店</h1><p>テーブル: ${table.name}</p><p>注文番号: ${order.id.slice(-8)}</p><table style="width:100%;border-collapse:collapse">${lines}</table><p style="text-align:right;font-size:18px;font-weight:bold;margin-top:16px">合計 ${formatYen(totals.amount)}</p><script>window.print();</script></body></html>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>レシート</title></head><body style="font-family:sans-serif;padding:24px"><h1>あづま家</h1><p>テーブル: ${table.name}</p><p>注文番号: ${order.id.slice(-8)}</p><table style="width:100%;border-collapse:collapse">${lines}</table><p style="text-align:right;font-size:18px;font-weight:bold;margin-top:16px">合計 ${formatYen(totals.amount)}</p><script>window.print();</script></body></html>`;
     const win = window.open("", "_blank", "width=360,height=640");
     if (!win) {
       setToast("印刷ウィンドウを開けませんでした");
@@ -454,12 +647,12 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
 
   if (loadError) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#efefef] p-6 text-center">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--pos-bg)] p-6 text-center">
         <p className="text-stone-600">{loadError}</p>
         <button
           type="button"
-          onClick={load}
-          className="mt-4 rounded-lg bg-[#e8912d] px-6 py-2.5 text-white"
+          onClick={() => void load()}
+          className="mt-4 rounded-lg bg-[var(--pos-accent)] px-6 py-2.5 text-white"
         >
           再読み込み
         </button>
@@ -472,18 +665,18 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
 
   if (!table) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#efefef] text-stone-500">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--pos-bg)] text-stone-500">
         読み込み中…
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#efefef] waiter-scroll-pad-bottom">
+    <div className="flex min-h-screen flex-col bg-[var(--pos-bg)] waiter-scroll-pad-bottom">
       {/* Header */}
       <header
         className="waiter-top-bar sticky top-0 z-20 flex shrink-0 items-center justify-between px-3 text-white"
-        style={{ backgroundColor: ORANGE }}
+        style={{ backgroundColor: POS_ACCENT }}
       >
         <Link href="/waiter/tables" className="waiter-header-btn min-w-[56px] text-[15px] leading-none">
           ‹ 戻る
@@ -494,7 +687,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
             <span className="ml-1 rounded bg-white/25 px-1.5 py-0.5 text-[11px]">QR</span>
           )}
         </h1>
-        <button type="button" onClick={load} className="waiter-header-btn min-w-[56px] justify-end text-right text-[18px] leading-none" aria-label="更新">
+        <button type="button" onClick={() => void load()} className="waiter-header-btn min-w-[56px] justify-end text-right text-[18px] leading-none" aria-label="更新">
           ↻
         </button>
       </header>
@@ -524,21 +717,32 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
               }
             }}
             onPrint={printReceipt}
-            onTable={() => router.push("/waiter/tables")}
+            onTable={() => setTableOps("menu")}
             loading={loading}
+            guestUpdating={guestUpdating}
           />
         )}
 
         {tab === "summary" && !order && (
           <div className="p-8 text-center">
-            <p className="text-stone-500">注文がありません</p>
-            <button
-              type="button"
-              onClick={() => router.push(`/waiter/order/${tableId}/categories`)}
-              className="mt-4 rounded-lg bg-[#e8912d] px-6 py-3 text-[15px] font-semibold text-white"
-            >
-              メニューから注文する
-            </button>
+            <p className="text-stone-500">{orderLoadError || "注文がありません"}</p>
+            {orderLoadError ? (
+              <button
+                type="button"
+                onClick={() => void load()}
+                className="mt-4 rounded-lg bg-[var(--pos-accent)] px-6 py-3 text-[15px] font-semibold text-white"
+              >
+                再読み込み
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => router.push(`/waiter/order/${tableId}/categories`)}
+                className="mt-4 rounded-lg bg-[var(--pos-accent)] px-6 py-3 text-[15px] font-semibold text-white"
+              >
+                メニューから注文する
+              </button>
+            )}
           </div>
         )}
 
@@ -548,6 +752,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
             onUpdateQty={requestUpdateQty}
             onServe={serveItem}
             loading={loading}
+            busyItemId={busyItemId}
           />
         )}
       </div>
@@ -566,7 +771,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
             type="button"
             onClick={() => switchTab(t.id)}
             className="flex flex-1 flex-col items-center py-3 text-[11px]"
-            style={{ color: tab === t.id ? ORANGE : "#888" }}
+            style={{ color: tab === t.id ? POS_ACCENT : "#888" }}
           >
             <span className="text-[20px]">{t.icon}</span>
             {t.label}
@@ -607,7 +812,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
                 type="button"
                 onClick={() => saveStaff(staffDraft)}
                 className="flex-1 rounded-lg py-3 font-semibold text-white"
-                style={{ backgroundColor: ORANGE }}
+                style={{ backgroundColor: POS_ACCENT }}
               >
                 保存
               </button>
@@ -629,7 +834,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
                     await updateMeta({ customerSegment: seg });
                     setSegmentOpen(false);
                   }}
-                  className={`rounded-lg border py-3 text-[15px] ${order?.customerSegment === seg ? "border-amber-500 bg-amber-50 font-semibold" : "border-stone-200"}`}
+                  className={`rounded-lg border py-3 text-[15px] active:bg-stone-50 ${order?.customerSegment === seg ? "border-[var(--pos-accent)] bg-[var(--pos-accent-soft)] font-semibold" : "border-stone-200"}`}
                 >
                   {seg}
                 </button>
@@ -664,7 +869,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
                 type="button"
                 onClick={saveMemo}
                 className="flex-1 rounded-lg py-3 font-semibold text-white"
-                style={{ backgroundColor: ORANGE }}
+                style={{ backgroundColor: POS_ACCENT }}
               >
                 保存
               </button>
@@ -683,7 +888,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
                   {totals.count}点 / {order?.customerCount ?? 1}人
                 </span>
               </div>
-              <p className="mt-2 text-center text-[34px] font-bold tabular-nums" style={{ color: BLUE }}>
+              <p className="mt-2 text-center text-[34px] font-bold tabular-nums" style={{ color: POS_ACCENT }}>
                 {formatYen(payableAmount)}
               </p>
               {discountValue > 0 && (
@@ -718,9 +923,9 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
                     key={m}
                     type="button"
                     onClick={() => setPaymentMethod(m)}
-                    className={`rounded-lg border py-3 text-[15px] font-medium ${
+                    className={`rounded-lg border py-3 text-[15px] font-medium active:bg-stone-50 ${
                       paymentMethod === m
-                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        ? "border-[var(--pos-accent)] bg-[var(--pos-accent-soft)] text-[var(--pos-accent-press)]"
                         : "border-stone-200 text-stone-700"
                     }`}
                   >
@@ -751,7 +956,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
                       key={q.label}
                       type="button"
                       onClick={() => setTendered(String(Math.max(q.value, payableAmount)))}
-                      className="flex-1 rounded-lg border border-stone-300 py-2 text-[13px] font-medium text-stone-700 active:bg-stone-100"
+                      className="flex-1 rounded-lg border border-stone-300 py-3 text-[13px] font-medium text-stone-700 active:bg-stone-100"
                     >
                       {q.label}
                     </button>
@@ -785,7 +990,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
                 onClick={completeCheckout}
                 disabled={loading}
                 className="flex-[2] rounded-lg py-3.5 text-[16px] font-semibold text-white disabled:opacity-50"
-                style={{ backgroundColor: BLUE }}
+                style={{ backgroundColor: POS_ACCENT }}
               >
                 {loading ? "処理中…" : "会計完了"}
               </button>
@@ -798,7 +1003,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
         <div className="fixed inset-0 z-50 flex items-end bg-black/40">
           <div className="pb-safe w-full rounded-t-2xl bg-white p-6">
             <h2 className="text-center text-[17px] font-bold">STORES決済</h2>
-            <p className="mt-4 text-center text-[36px] font-bold tabular-nums" style={{ color: BLUE }}>
+            <p className="mt-4 text-center text-[36px] font-bold tabular-nums" style={{ color: POS_ACCENT }}>
               {formatYen(storesSession.amount)}
             </p>
             <p className="mt-4 text-center text-[14px] leading-relaxed text-stone-600">
@@ -832,7 +1037,7 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
                 onClick={confirmStoresPayment}
                 disabled={loading}
                 className="flex-[2] rounded-lg py-3.5 text-[16px] font-semibold text-white disabled:opacity-50"
-                style={{ backgroundColor: BLUE }}
+                style={{ backgroundColor: POS_ACCENT }}
               >
                 {loading ? "処理中…" : "決済完了"}
               </button>
@@ -869,6 +1074,149 @@ export function TableOrderApp({ tableId }: { tableId: string }) {
         </ConfirmDialog>
       )}
 
+      {tableOps === "menu" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6">
+          <div className="w-full max-w-[300px] overflow-hidden rounded-2xl bg-white shadow-xl">
+            <p className="border-b border-stone-200 px-4 py-3 text-center text-[15px] font-semibold text-stone-900">
+              テーブル操作
+            </p>
+            {(
+              [
+                { label: "テーブル移動", action: () => void openTableOp("move") },
+                { label: "テーブル分割", action: () => void openTableOp("split-items") },
+                { label: "テーブル結合", action: () => void openTableOp("merge") },
+              ] as const
+            ).map((row) => (
+              <button
+                key={row.label}
+                type="button"
+                disabled={!order || tableOpsLoading}
+                onClick={row.action}
+                className="w-full border-b border-stone-100 px-4 py-3.5 text-center text-[16px] text-[var(--pos-accent)] active:bg-stone-50 disabled:opacity-40"
+              >
+                {row.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setTableOps(null)}
+              className="w-full px-4 py-3.5 text-center text-[16px] text-[var(--pos-accent)] active:bg-stone-50"
+            >
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tableOps === "split-items" && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+          <div className="flex max-h-[85dvh] w-full max-w-[var(--waiter-width)] flex-col rounded-t-2xl bg-white sm:rounded-2xl">
+            <div className="border-b border-stone-200 px-4 py-3 text-center text-[15px] font-semibold">
+              分割する商品を選択
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {splitCandidates.map((item) => {
+                const selected = splitSelected.has(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setSplitSelected((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(item.id)) next.delete(item.id);
+                        else next.add(item.id);
+                        return next;
+                      });
+                    }}
+                    className={`flex w-full items-center justify-between border-b border-stone-100 px-4 py-3 text-left ${
+                      selected ? "bg-[var(--pos-accent-soft)]" : "bg-white"
+                    }`}
+                  >
+                    <span className="text-[15px] text-stone-900">{item.displayName}</span>
+                    <span className="text-[14px] text-stone-500">{formatYen(item.lineTotal)}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex border-t border-stone-200">
+              <button
+                type="button"
+                onClick={() => setTableOps("menu")}
+                className="flex-1 py-3.5 text-[15px] text-stone-500"
+              >
+                戻る
+              </button>
+              <button
+                type="button"
+                disabled={splitSelected.size === 0}
+                onClick={async () => {
+                  setTableOps("split-table");
+                  await loadTableChoices("split-table");
+                }}
+                className="flex-1 py-3.5 text-[15px] font-semibold text-[var(--pos-accent)] disabled:opacity-40"
+              >
+                次へ（{splitSelected.size}点）
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(tableOps === "move" || tableOps === "split-table" || tableOps === "merge") && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+          <div className="flex max-h-[85dvh] w-full max-w-[var(--waiter-width)] flex-col rounded-t-2xl bg-white sm:rounded-2xl">
+            <div className="border-b border-stone-200 px-4 py-3 text-center text-[15px] font-semibold">
+              {tableOps === "move"
+                ? "移動先テーブル"
+                : tableOps === "split-table"
+                  ? "分割先テーブル"
+                  : "結合するテーブル"}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {tableChoices.map((t) => {
+                const isCurrent = t.id === tableId;
+                const occupied = Boolean(t.orderId);
+                const selectable =
+                  !isCurrent && (tableOps === "merge" ? occupied : !occupied);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    disabled={tableOpsLoading || !selectable}
+                    onClick={() => {
+                      if (!selectable) return;
+                      if (tableOps === "move") void confirmMove(t.id);
+                      else if (tableOps === "split-table") void confirmSplit(t.id);
+                      else if (t.orderId) void confirmMerge(t.orderId);
+                    }}
+                    className="flex w-full items-center justify-between border-b border-stone-100 px-4 py-3.5 text-left active:bg-stone-50 disabled:opacity-40"
+                  >
+                    <span className="text-[16px] font-medium text-stone-900">{t.name}</span>
+                    <span className="text-[13px] text-stone-500">
+                      {isCurrent
+                        ? "現在"
+                        : occupied
+                          ? `${t.itemCount}点 / ${formatYen(t.totalAmount)}`
+                          : "空席"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setTableOps(tableOps === "split-table" ? "split-items" : "menu")
+              }
+              className="border-t border-stone-200 py-3.5 text-[15px] text-stone-500"
+            >
+              戻る
+            </button>
+          </div>
+        </div>
+      )}
+
       <Toast message={toast} onClose={() => setToast("")} />
     </div>
   );
@@ -889,6 +1237,7 @@ function SummaryTab({
   onPrint,
   onTable,
   loading = false,
+  guestUpdating = false,
 }: {
   order: Order;
   now: number;
@@ -904,6 +1253,7 @@ function SummaryTab({
   onPrint: () => void;
   onTable: () => void;
   loading?: boolean;
+  guestUpdating?: boolean;
 }) {
   const rows = [
     { label: "入店時間", value: formatDateTime(order.createdAt), action: null },
@@ -935,16 +1285,18 @@ function SummaryTab({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
+                  disabled={loading || guestUpdating}
                   onClick={() => onGuests(-1)}
-                  className="flex h-11 w-11 items-center justify-center rounded-full border border-stone-300 text-[20px]"
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-stone-300 text-[20px] disabled:opacity-40"
                 >
                   −
                 </button>
                 <span className="min-w-[40px] text-center text-[16px]">{row.value}</span>
                 <button
                   type="button"
+                  disabled={loading || guestUpdating}
                   onClick={() => onGuests(1)}
-                  className="flex h-11 w-11 items-center justify-center rounded-full border border-stone-300 text-[20px]"
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-stone-300 text-[20px] disabled:opacity-40"
                 >
                   ＋
                 </button>
@@ -954,7 +1306,7 @@ function SummaryTab({
                 <div className="text-right">
                   <div className="text-[16px] text-stone-900">{row.value}</div>
                   {"sub" in row && row.sub && (
-                    <div className="text-[15px] font-bold" style={{ color: BLUE }}>
+                    <div className="text-[15px] font-bold" style={{ color: POS_ACCENT }}>
                       {row.sub}
                     </div>
                   )}
@@ -970,28 +1322,27 @@ function SummaryTab({
 
       <div className="p-4">
         {pendingCount > 0 && (
-          <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-center text-[13px] text-amber-800">
-            未送信の注文が {pendingCount} 点あります
+          <p className="mb-3 rounded-lg bg-[var(--pos-accent-soft)] px-3 py-2 text-center text-[13px] text-[var(--pos-accent-press)]">
+            未送信 {pendingCount} 点も会計に含まれます
           </p>
         )}
           {inKitchenCount > 0 && (
-          <p className="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-center text-[13px] text-blue-800">
-            調理中・未提供 {inKitchenCount} 点 — 提供完了後に会計できます
+          <p className="mb-3 rounded-lg bg-stone-100 px-3 py-2 text-center text-[13px] text-stone-600">
+            調理中 {inKitchenCount} 点 — 調理完了後に会計できます
           </p>
         )}
         {order.channel === "QR" && (
-          <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-center text-[13px] text-amber-800">
+          <p className="mb-3 rounded-lg bg-[var(--pos-accent-soft)] px-3 py-2 text-center text-[13px] text-[var(--pos-accent-press)]">
             QRオーダー中 — 取引中止でお客様画面もリセットされます
           </p>
         )}
         <button
           type="button"
           onClick={onCheckout}
-          disabled={loading || pendingCount > 0 || inKitchenCount > 0 || totals.count === 0}
-          className="flex w-full items-center justify-center gap-2 rounded-lg py-4 text-[17px] font-semibold text-white disabled:opacity-50"
-          style={{ backgroundColor: BLUE }}
+          disabled={loading || inKitchenCount > 0 || totals.count === 0}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--pos-accent)] py-4 text-[17px] font-semibold text-white active:bg-[var(--pos-accent-press)] disabled:opacity-50"
         >
-          ✓ 会計する
+          会計する（{formatYen(totals.amount)}）
         </button>
       </div>
 
@@ -1021,11 +1372,13 @@ function HistoryTab({
   onUpdateQty,
   onServe,
   loading,
+  busyItemId,
 }: {
   items: OrderItem[];
   onUpdateQty: (itemId: string, quantity: number, productName: string) => void;
   onServe: (itemId: string) => void;
   loading: boolean;
+  busyItemId: string | null;
 }) {
   const displayItems = groupOrderItemsForDisplay(items);
 
@@ -1040,7 +1393,7 @@ function HistoryTab({
     <div>
       <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50 px-4 py-2 text-[13px] text-stone-500">
         <span>{totalCount}点</span>
-        <span className="font-semibold tabular-nums" style={{ color: BLUE }}>
+        <span className="font-semibold tabular-nums" style={{ color: POS_ACCENT }}>
           {formatYen(totalAmount)}
         </span>
       </div>
@@ -1068,7 +1421,7 @@ function HistoryTab({
               <div className="mt-2 flex items-center gap-3">
                 <button
                   type="button"
-                  disabled={loading}
+                  disabled={loading || busyItemId === item.id}
                   onClick={() => onUpdateQty(item.id, item.quantity - 1, item.productName)}
                   className="flex h-11 w-11 items-center justify-center rounded-full border border-stone-300 text-[18px] disabled:opacity-40"
                 >
@@ -1077,7 +1430,7 @@ function HistoryTab({
                 <span className="min-w-[24px] text-center text-[15px] font-medium">{item.quantity}</span>
                 <button
                   type="button"
-                  disabled={loading}
+                  disabled={loading || busyItemId === item.id}
                   onClick={() => onUpdateQty(item.id, item.quantity + 1, item.productName)}
                   className="flex h-11 w-11 items-center justify-center rounded-full border border-stone-300 text-[18px] disabled:opacity-40"
                 >
@@ -1085,9 +1438,21 @@ function HistoryTab({
                 </button>
                 <button
                   type="button"
-                  disabled={loading}
+                  disabled={loading || busyItemId === item.id}
                   onClick={() => onUpdateQty(item.id, 0, item.productName)}
-                  className="ml-2 text-[13px] text-red-500 disabled:opacity-40"
+                  className="ml-2 flex h-11 items-center rounded-lg border border-red-200 px-3 text-[13px] font-medium text-[var(--pos-danger)] active:bg-red-50 disabled:opacity-40"
+                >
+                  取消
+                </button>
+              </div>
+            )}
+            {item.status !== "PENDING" && item.status !== "CANCELLED" && (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  disabled={loading || busyItemId === item.id}
+                  onClick={() => onUpdateQty(item.id, 0, item.productName)}
+                  className="flex h-11 items-center rounded-lg border border-red-200 px-3 text-[13px] font-medium text-[var(--pos-danger)] active:bg-red-50 disabled:opacity-40"
                 >
                   取消
                 </button>
@@ -1095,15 +1460,15 @@ function HistoryTab({
             )}
           </div>
           <div className="ml-3 flex shrink-0 flex-col items-end gap-1.5">
-            <span className="text-[15px] font-medium" style={{ color: BLUE }}>
+            <span className="text-[15px] font-medium" style={{ color: POS_ACCENT }}>
               {formatYen(item.lineTotal)}
             </span>
-            {item.status === "DONE" && (
+            {(item.status === "DONE" || item.status === "SENT" || item.status === "COOKING") && (
               <button
                 type="button"
-                disabled={loading}
+                disabled={loading || busyItemId === item.id}
                 onClick={() => onServe(item.id)}
-                className="rounded-full bg-emerald-500 px-3 py-1 text-[12px] font-medium text-white disabled:opacity-40"
+                className="flex h-10 items-center rounded-full bg-[var(--pos-success)] px-4 text-[13px] font-semibold text-white active:opacity-80 disabled:opacity-40"
               >
                 提供する
               </button>

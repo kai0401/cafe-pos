@@ -59,7 +59,7 @@ export default function WaiterHistoryMonthPage() {
       {data && (
         <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50 px-4 py-2 text-[13px]">
           <span className="text-stone-500">月合計 {data.summary.count}取引</span>
-          <span className="font-bold tabular-nums text-[#007aff]">
+          <span className="font-bold tabular-nums text-[var(--pos-accent)]">
             {formatYen(data.summary.total)}
           </span>
         </div>

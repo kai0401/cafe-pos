@@ -14,10 +14,12 @@ import {
 } from "recharts";
 import { formatYen } from "@/lib/format";
 
-const CHART_GRID = "rgba(154, 146, 136, 0.12)";
-const CHART_TICK = "#9a9288";
+const ACCENT = "#9a5c38";
+const SAGE = "#5c6b54";
+const CHART_GRID = "rgba(138, 125, 112, 0.18)";
+const CHART_TICK = "#8a7d70";
 
-function DarkTooltip({
+function ReportTooltip({
   active,
   payload,
   label,
@@ -28,10 +30,10 @@ function DarkTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="border border-[#2a241c] bg-[#12100e]/95 px-3 py-2 text-xs shadow-xl backdrop-blur-sm">
-      <p className="mb-1 text-[#9a9288]">{label}</p>
+    <div className="rounded-lg border border-[var(--admin-line)] bg-[var(--admin-paper-raised)] px-3 py-2 text-xs shadow-md">
+      <p className="mb-1 text-[var(--admin-muted)]">{label}</p>
       {payload.map((p) => (
-        <p key={p.name} className="font-mono font-semibold text-[#f0d78c]">
+        <p key={p.name} className="font-medium tabular-nums text-[var(--admin-ink)]">
           {formatYen(p.value)}
         </p>
       ))}
@@ -54,8 +56,8 @@ export function ProfitLossDailyChart({
       <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="plRevenueGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#d4af37" stopOpacity={0.35} />
-            <stop offset="100%" stopColor="#d4af37" stopOpacity={0} />
+            <stop offset="0%" stopColor={ACCENT} stopOpacity={0.25} />
+            <stop offset="100%" stopColor={ACCENT} stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid stroke={CHART_GRID} strokeDasharray="4 4" vertical={false} />
@@ -73,15 +75,15 @@ export function ProfitLossDailyChart({
           axisLine={false}
           width={42}
         />
-        <Tooltip content={<DarkTooltip />} />
+        <Tooltip content={<ReportTooltip />} />
         <Area
           type="monotone"
           dataKey="revenue"
-          stroke="#d4af37"
+          stroke={ACCENT}
           strokeWidth={2}
           fill="url(#plRevenueGrad)"
           dot={false}
-          activeDot={{ r: 4, fill: "#f0d78c", stroke: "#d4af37", strokeWidth: 2 }}
+          activeDot={{ r: 4, fill: "#fffcf8", stroke: ACCENT, strokeWidth: 2 }}
         />
       </AreaChart>
     </ResponsiveContainer>
@@ -94,7 +96,6 @@ export function ProfitLossCategoryChart({
   data: { name: string; profit: number; revenue: number }[];
 }) {
   const top = data.slice(0, 8);
-  const colors = ["#d4af37", "#c9a227", "#b8942f", "#a08030", "#8a7340", "#6ecf9a", "#5cb88a", "#4a9a72"];
 
   return (
     <ResponsiveContainer width="100%" height={Math.max(180, top.length * 36)}>
@@ -115,10 +116,10 @@ export function ProfitLossCategoryChart({
           tickLine={false}
           axisLine={false}
         />
-        <Tooltip content={<DarkTooltip />} />
+        <Tooltip content={<ReportTooltip />} />
         <Bar dataKey="profit" radius={[0, 3, 3, 0]} barSize={14}>
           {top.map((_, i) => (
-            <Cell key={i} fill={colors[i % colors.length]} />
+            <Cell key={i} fill={i % 2 === 0 ? ACCENT : SAGE} />
           ))}
         </Bar>
       </BarChart>

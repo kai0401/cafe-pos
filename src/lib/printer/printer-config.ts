@@ -26,14 +26,46 @@ export const DEFAULT_CONFIG: PrinterConfig = {
   printReceipt: true,
   kickDrawer: true,
   cols: 48,
-  storeName: "喫茶店",
+  storeName: "あづま家",
 };
 
 const CONFIG_PATH = path.join(process.cwd(), "printer-config.json");
 
+/**
+ * クラウド運用時の疑似 IP。これが設定されていると sendToPrinter は
+ * 直接送信せず印刷キュー（PrintJob）に入れ、店舗 Mac の印刷エージェントが印刷する。
+ */
+export const PRINT_AGENT_IP = "agent";
+
+export function isPrintAgentMode(config: Pick<PrinterConfig, "ip">): boolean {
+  return config.ip === PRINT_AGENT_IP;
+}
+
+/** クラウドで印刷キューを使うか（PRINT_AGENT_ENABLED=0 で無効） */
+export function isPrintAgentEnabled(): boolean {
+  return process.env.PRINT_AGENT_ENABLED !== "0";
+}
+
+function envBool(name: string, fallback: boolean): boolean {
+  const v = process.env[name];
+  if (v === undefined || v === "") return fallback;
+  return v === "1" || v.toLowerCase() === "true";
+}
+
 export function loadPrinterConfig(): PrinterConfig {
   if (!isPrinterSupported()) {
-    return { ...DEFAULT_CONFIG, ip: "" };
+    if (!isPrintAgentEnabled()) {
+      return { ...DEFAULT_CONFIG, ip: "" };
+    }
+    return {
+      ...DEFAULT_CONFIG,
+      ip: PRINT_AGENT_IP,
+      printKitchenTicket: envBool("PRINT_KITCHEN_TICKET", DEFAULT_CONFIG.printKitchenTicket),
+      printReceipt: envBool("PRINT_RECEIPT", DEFAULT_CONFIG.printReceipt),
+      kickDrawer: envBool("PRINT_KICK_DRAWER", DEFAULT_CONFIG.kickDrawer),
+      cols: Number(process.env.PRINT_COLS ?? DEFAULT_CONFIG.cols) || DEFAULT_CONFIG.cols,
+      storeName: process.env.PRINT_STORE_NAME || DEFAULT_CONFIG.storeName,
+    };
   }
   try {
     const raw = fs.readFileSync(CONFIG_PATH, "utf8");

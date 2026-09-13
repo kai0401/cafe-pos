@@ -8,13 +8,17 @@
     "dev:tunnel": "node scripts/dev-tunnel.mjs",
     "start:shop": "node scripts/start-shop.mjs",
     "shop": "node scripts/shop-server.mjs",
+    "shop:reload": "node scripts/shop-reload.mjs",
+    "shop:hot": "node scripts/shop-reload.mjs --build",
     "shop:setup": "node scripts/sync-public-url.mjs",
     "shop:install": "node scripts/install-shop-daemon.mjs",
     "shop:remote": "node scripts/shop-tunnel.mjs",
     "shop:remote:install": "node scripts/install-shop-remote.mjs",
     "rollout:check": "tsx scripts/rollout-check.ts",
+    "smoke:check": "tsx scripts/smoke-check.ts",
     "verify:dashboard": "tsx scripts/verify-dashboard.ts",
     "db:backup": "bash scripts/backup-db.sh",
+    "export:smaregi": "tsx scripts/export-smaregi-csv.ts",
     "build": "prisma generate && next build",
     "vercel-build": "node scripts/vercel-build.mjs",
     "cloud:init": "tsx scripts/cloud-init.ts",
@@ -40,7 +44,17 @@
     "preview:keepalive": "node scripts/preview-keepalive.mjs",
     "preview:stable": "node scripts/preview-stable.mjs",
     "preview:mobile": "node scripts/preview-mobile.mjs",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "pi:export": "bash scripts/pi-export-from-mac.sh",
+    "pi:push": "bash scripts/pi-push.sh",
+    "pi:status": "bash scripts/pi-remote.sh status",
+    "pi:logs": "bash scripts/pi-remote.sh logs",
+    "pi:restart": "bash scripts/pi-remote.sh restart",
+    "pi:deploy": "bash scripts/pi-remote.sh deploy",
+    "pi:backup": "bash scripts/pi-remote.sh backup",
+    "pi:backup-pull": "bash scripts/pi-remote.sh backup-pull",
+    "pi:ssh-update": "bash scripts/pi-update-ssh-host.sh",
+    "pi:open": "bash scripts/pi-open-cursor.sh"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
@@ -55,10 +69,13 @@
     "recharts": "^3.9.0",
     "sharp": "^0.35.3",
     "tesseract.js": "^7.0.0",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@tailwindcss/postcss": "^4",
+    "tailwindcss": "^4",
+    "tsx": "^4.22.4",
+    "prisma": "6.19.3"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
     "@types/qrcode": "^1.5.6",
@@ -67,9 +84,6 @@
     "embedded-postgres": "18.4.0-beta.17",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
-    "prisma": "6.19.3",
-    "tailwindcss": "^4",
-    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

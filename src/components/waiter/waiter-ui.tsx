@@ -2,36 +2,54 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-
-const ORANGE = "#e8912d";
+import { POS_ACCENT } from "@/lib/pos-theme";
 
 export function WaiterHeader({
   title,
   backHref,
+  backLabel = "戻る",
+  onBack,
   onRefresh,
+  rightSlot,
 }: {
   title: string;
   backHref?: string;
+  backLabel?: string;
+  onBack?: () => void;
   onRefresh?: () => void;
+  rightSlot?: React.ReactNode;
 }) {
   return (
     <header
       className="waiter-top-bar sticky top-0 z-20 flex shrink-0 items-center justify-between px-3 text-white"
-      style={{ backgroundColor: ORANGE }}
+      style={{ backgroundColor: POS_ACCENT }}
     >
-      {backHref ? (
-        <Link href={backHref} className="waiter-header-btn min-w-[56px] text-[15px] leading-none">
-          ‹ 戻る
+      {onBack ? (
+        <button
+          type="button"
+          onClick={onBack}
+          className="waiter-header-btn min-w-[56px] text-left text-[15px] leading-none active:opacity-60"
+        >
+          ‹ {backLabel}
+        </button>
+      ) : backHref ? (
+        <Link
+          href={backHref}
+          className="waiter-header-btn min-w-[56px] text-[15px] leading-none active:opacity-60"
+        >
+          ‹ {backLabel}
         </Link>
       ) : (
         <div className="min-w-[56px]" />
       )}
       <h1 className="truncate text-[15px] font-semibold">{title}</h1>
-      {onRefresh ? (
+      {rightSlot ? (
+        <div className="flex min-w-[56px] justify-end">{rightSlot}</div>
+      ) : onRefresh ? (
         <button
           type="button"
           onClick={onRefresh}
-          className="waiter-header-btn flex min-w-[56px] items-center justify-end text-[18px] leading-none"
+          className="waiter-header-btn flex min-w-[56px] items-center justify-end text-[18px] leading-none active:opacity-60"
           aria-label="更新"
         >
           ↻
@@ -86,7 +104,7 @@ export function WaiterRow({
 
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-[#efefef] px-4 py-1.5 text-[12px] font-medium text-stone-500">{children}</div>
+    <div className="bg-[var(--pos-bg)] px-4 py-1.5 text-[12px] font-medium text-[var(--pos-muted)]">{children}</div>
   );
 }
 
@@ -110,9 +128,9 @@ export function PrimaryButton({
   variant?: "primary" | "danger" | "secondary";
 }) {
   const colors = {
-    primary: "bg-[#e8912d] text-white active:bg-[#d4821f]",
+    primary: "bg-[var(--pos-accent)] text-white active:bg-[var(--pos-accent-press)]",
     danger: "bg-red-500 text-white active:bg-red-600",
-    secondary: "border border-stone-300 bg-white text-stone-700",
+    secondary: "border border-stone-300 bg-white text-stone-700 active:bg-stone-100",
   };
   return (
     <button
@@ -156,9 +174,13 @@ export function Toast({
 export function GuestCountDialog({
   onConfirm,
   onCancel,
+  confirmLabel = "開始中…",
+  disabled = false,
 }: {
   onConfirm: (count: number) => void;
   onCancel: () => void;
+  confirmLabel?: string;
+  disabled?: boolean;
 }) {
   const counts = [1, 2, 3, 4, 5, 6, 7, 8];
   return (
@@ -170,16 +192,21 @@ export function GuestCountDialog({
             <button
               key={n}
               type="button"
+              disabled={disabled}
               onClick={() => onConfirm(n)}
-              className="rounded-xl border border-stone-200 py-3 text-[18px] font-semibold active:bg-amber-50"
+              className="rounded-xl border border-stone-200 py-3 text-[18px] font-semibold active:bg-[var(--pos-accent-soft)] disabled:opacity-40"
             >
               {n}
             </button>
           ))}
         </div>
-        <button type="button" onClick={onCancel} className="mt-3 w-full py-2.5 text-[15px] text-stone-500">
-          キャンセル
-        </button>
+        {disabled ? (
+          <p className="mt-3 text-center text-[14px] text-stone-500">{confirmLabel}</p>
+        ) : (
+          <button type="button" onClick={onCancel} className="mt-3 w-full py-2.5 text-[15px] text-stone-500">
+            キャンセル
+          </button>
+        )}
       </div>
     </div>
   );
@@ -207,14 +234,14 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 rounded-lg border border-stone-300 py-2.5 text-[15px]"
+            className="flex-1 rounded-lg border border-stone-300 py-2.5 text-[15px] active:bg-stone-100"
           >
             キャンセル
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="flex-1 rounded-lg bg-[#e8912d] py-2.5 text-[15px] font-semibold text-white"
+            className="flex-1 rounded-lg bg-[var(--pos-accent)] py-2.5 text-[15px] font-semibold text-white active:bg-[var(--pos-accent-press)]"
           >
             {confirmLabel}
           </button>

@@ -49,7 +49,9 @@ export default function ClosingPage() {
         setMessage(
           result.printed
             ? "レジ締めが完了しました。締めレポートを印刷しました。"
-            : "レジ締めが完了しました（プリンター未接続のため印刷はスキップ）。",
+            : result.smaregiArchiveDir
+              ? `レジ締めが完了しました。スマレジ形式CSVを ${result.smaregiArchiveDir} に保存しました。`
+              : "レジ締めが完了しました（プリンター未接続のため印刷はスキップ）。",
         );
         load();
       }
@@ -60,25 +62,36 @@ export default function ClosingPage() {
   }
 
   if (!data) {
-    return <p className="text-stone-400">読み込み中…</p>;
+    return (
+      <div>
+        <PageHeader eyebrow="CLOSING" title="レジ締め" />
+        <div className="admin-card p-10 text-center text-sm text-[var(--admin-muted)]">読み込み中…</div>
+      </div>
+    );
   }
 
   return (
     <div>
-      <PageHeader title="レジ締め" description={`営業日: ${data.businessDate}`}>
+      <PageHeader eyebrow="CLOSING" title="レジ締め" description={`営業日: ${data.businessDate}`}>
         <div className="flex flex-wrap gap-2">
           <a
-            href="/api/admin/export/sales"
-            className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+            href={`/api/admin/export/smaregi/transactions?date=${data.businessDate}&dataSource=ALL`}
+            className="admin-btn admin-btn--ghost"
           >
-            月次CSV出力
+            スマレジ形式CSV
+          </a>
+          <a href="/api/admin/export/smaregi/products" className="admin-btn admin-btn--ghost">
+            商品CSV
+          </a>
+          <a href="/api/admin/export/sales" className="admin-btn admin-btn--ghost">
+            月次CSV（内部）
           </a>
           {confirming ? (
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-600"
+                className="admin-btn admin-btn--ghost"
               >
                 キャンセル
               </button>
@@ -86,7 +99,7 @@ export default function ClosingPage() {
                 type="button"
                 disabled={loading}
                 onClick={executeClosing}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                className="admin-btn !bg-[var(--admin-vermillion)] !text-white disabled:opacity-50"
               >
                 {loading ? "処理中…" : "締めを確定する"}
               </button>
@@ -95,7 +108,7 @@ export default function ClosingPage() {
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white"
+              className="admin-btn admin-btn--primary"
             >
               レジ締めを実行
             </button>
@@ -104,19 +117,19 @@ export default function ClosingPage() {
       </PageHeader>
 
       {message && (
-        <p className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <p className="mb-6 rounded-xl border border-[var(--admin-line)] bg-[var(--admin-accent-soft)] px-4 py-3 text-sm text-[var(--admin-ink)]">
           {message}
         </p>
       )}
 
       {data.openOrderCount > 0 && (
-        <p className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p className="mb-6 rounded-xl border border-[var(--admin-vermillion)]/30 bg-[rgba(184,74,58,0.08)] px-4 py-3 text-sm font-medium text-[var(--admin-vermillion)]">
           未会計のテーブルが {data.openOrderCount} 件あります。締め前に会計を完了してください。
         </p>
       )}
 
       {data.closedAt && (
-        <p className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <p className="mb-6 rounded-xl border border-[var(--admin-line)] bg-[var(--admin-sage-soft)] px-4 py-3 text-sm text-[var(--admin-sage)]">
           本日は締め済みです（{new Date(data.closedAt).toLocaleString("ja-JP")}）。再実行すると最新の内容で上書きされます。
         </p>
       )}
@@ -132,19 +145,25 @@ export default function ClosingPage() {
         <KpiCard title="値引き" value={formatYen(data.discountTotal)} sub={`内消費税 ${formatYen(data.taxTotal)}`} />
       </div>
 
-      <div className="mt-8 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-sm font-semibold text-stone-600">支払い方法別</h2>
-        {data.payments.length === 0 && <p className="text-sm text-stone-400">本日の取引はまだありません</p>}
+      <div className="admin-card mt-8 p-6">
+        <h2 className="admin-title admin-brand-serif mb-4 text-base">支払い方法別</h2>
+        {data.payments.length === 0 && (
+          <p className="text-sm text-[var(--admin-muted)]">本日の取引はまだありません</p>
+        )}
         {data.payments.map((p) => (
-          <div key={p.method} className="flex justify-between border-b border-stone-100 py-2.5 text-sm last:border-0">
-            <span className="text-stone-700">{p.label}</span>
-            <span className="font-semibold tabular-nums text-stone-900">{formatYen(p.amount)}</span>
+          <div
+            key={p.method}
+            className="flex justify-between border-b border-[var(--admin-line)]/60 py-2.5 text-sm last:border-0"
+          >
+            <span className="text-[var(--admin-ink)]">{p.label}</span>
+            <span className="font-semibold tabular-nums text-[var(--admin-ink)]">{formatYen(p.amount)}</span>
           </div>
         ))}
       </div>
 
-      <p className="mt-6 text-xs text-stone-400">
-        締めを実行すると、本日のサマリーがレポートとして保存され、TM-m30 から締めレポートが印刷されます。
+      <p className="mt-6 text-xs leading-relaxed text-[var(--admin-muted)]">
+        締めを実行すると、本日のサマリーがレポートとして保存されます。クラウド運用では TM-m30
+        印刷は行われません（必要なら管理画面から CSV / 画面で確認）。
       </p>
     </div>
   );

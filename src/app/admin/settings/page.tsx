@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/admin/ui";
+import { ADMIN_INPUT_CLASS, PageHeader } from "@/components/admin/ui";
 
 const DOW = ["月", "火", "水", "木", "金", "土", "日"];
 
@@ -60,59 +60,63 @@ export default function StoreSettingsPage() {
     }
   }
 
-  if (!loaded) return <p className="text-stone-400">読み込み中…</p>;
-
-  const inputClass =
-    "w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-stone-500 focus:outline-none";
+  if (!loaded) {
+    return (
+      <div className="max-w-xl">
+        <PageHeader eyebrow="SETTINGS" title="営業設定" description="店舗情報・営業時間・定休日" />
+        <div className="admin-card p-10 text-center text-sm text-[var(--admin-muted)]">読み込み中…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-xl">
-      <PageHeader title="営業設定" description="店舗情報・営業時間・定休日" />
+      <PageHeader eyebrow="SETTINGS" title="営業設定" description="店舗情報・営業時間・定休日" />
 
-      <div className="space-y-5 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+      <div className="admin-card space-y-6 p-6">
         <div>
-          <label className="mb-1 block text-sm font-medium text-stone-600">店舗名</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
-          <p className="mt-1 text-xs text-stone-400">レシート・レポートの表示名に使われます</p>
+          <label className="admin-label">店舗名</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} className={ADMIN_INPUT_CLASS} />
+          <p className="mt-1.5 text-xs text-[var(--admin-muted)]">レシート・レポートの表示名に使われます</p>
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-stone-600">
-            インボイス登録番号
-          </label>
+          <label className="admin-label">インボイス登録番号</label>
           <input
             value={invoiceRegNumber}
             onChange={(e) => setInvoiceRegNumber(e.target.value)}
             placeholder="T1234567890123"
-            className={inputClass}
+            className={ADMIN_INPUT_CLASS}
           />
-          <p className="mt-1 text-xs text-stone-400">設定するとレシートに「登録番号」として印字されます</p>
+          <p className="mt-1.5 text-xs text-[var(--admin-muted)]">
+            設定するとレシートに「登録番号」として印字されます
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-stone-600">開店時間</label>
+            <label className="admin-label">開店時間</label>
             <input
               type="time"
               value={openTime}
               onChange={(e) => setOpenTime(e.target.value)}
-              className={inputClass}
+              className={ADMIN_INPUT_CLASS}
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-stone-600">閉店時間</label>
+            <label className="admin-label">閉店時間</label>
             <input
               type="time"
               value={closeTime}
               onChange={(e) => setCloseTime(e.target.value)}
-              className={inputClass}
+              className={ADMIN_INPUT_CLASS}
             />
           </div>
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-stone-600">定休日</label>
-          <div className="flex gap-2">
+          <label className="admin-label">定休日</label>
+          <div className="flex flex-wrap gap-2">
             {DOW.map((label, i) => {
               const active = closedDays.includes(i);
               return (
@@ -122,8 +126,8 @@ export default function StoreSettingsPage() {
                   onClick={() => toggleDay(i)}
                   className={`h-10 w-10 rounded-full text-sm font-semibold transition ${
                     active
-                      ? "bg-red-600 text-white"
-                      : "border border-stone-300 bg-white text-stone-500"
+                      ? "bg-[var(--admin-vermillion)] text-white"
+                      : "border border-[var(--admin-line)] bg-[var(--admin-paper-raised)] text-[var(--admin-muted)] hover:border-[var(--admin-accent)]"
                   }`}
                 >
                   {label}
@@ -131,41 +135,45 @@ export default function StoreSettingsPage() {
               );
             })}
           </div>
-          <p className="mt-1 text-xs text-stone-400">赤色の曜日が定休日です（売上分析の営業日判定に使用）</p>
+          <p className="mt-1.5 text-xs text-[var(--admin-muted)]">
+            赤茶色の曜日が定休日です（売上分析の営業日判定に使用）
+          </p>
         </div>
 
-        <div className="border-t border-stone-100 pt-5">
-          <h3 className="mb-3 text-sm font-semibold text-stone-700">STORES決済</h3>
-          <label className="flex items-center gap-3">
+        <div className="border-t border-[var(--admin-line)]/70 pt-5">
+          <h3 className="admin-label !mb-3">STORES決済</h3>
+          <label className="flex cursor-pointer items-center gap-3">
             <input
               type="checkbox"
               checked={storesEnabled}
               onChange={(e) => setStoresEnabled(e.target.checked)}
-              className="h-4 w-4 rounded border-stone-300"
+              className="h-4 w-4 rounded border-[var(--admin-line)] accent-[var(--admin-accent)]"
             />
-            <span className="text-sm text-stone-700">STORES決済を有効にする</span>
+            <span className="text-sm text-[var(--admin-ink)]">STORES決済を有効にする</span>
           </label>
-          <p className="mt-2 text-xs text-stone-400">
+          <p className="mt-2 text-xs leading-relaxed text-[var(--admin-muted)]">
             ウェイター会計・QRオーダーのお客様支払いで STORES決済が使えます。
             {storesApiConfigured
               ? " APIキー設定済み（オンライン決済URL対応）"
               : " 端末連携モード（STORES端末で決済後に「決済完了」）"}
           </p>
-          <p className="mt-1 text-xs text-stone-400">
-            オンライン決済を使う場合は .env に <code className="rounded bg-stone-100 px-1">STORES_API_KEY</code> を設定してください
+          <p className="mt-1 text-xs text-[var(--admin-muted)]">
+            オンライン決済を使う場合は .env に{" "}
+            <code className="rounded bg-[var(--admin-accent-soft)] px-1">STORES_API_KEY</code>{" "}
+            を設定してください
           </p>
         </div>
 
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex items-center gap-3 pt-1">
           <button
             type="button"
             disabled={saving}
             onClick={save}
-            className="rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+            className="admin-btn admin-btn--primary disabled:opacity-50"
           >
             {saving ? "保存中…" : "保存"}
           </button>
-          {message && <span className="text-sm text-emerald-600">{message}</span>}
+          {message && <span className="text-sm text-[var(--admin-sage)]">{message}</span>}
         </div>
       </div>
     </div>

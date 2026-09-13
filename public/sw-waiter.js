@@ -1,4 +1,4 @@
-const CACHE = "cafe-waiter-v2";
+const CACHE = "cafe-waiter-v3";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

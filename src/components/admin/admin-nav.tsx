@@ -17,24 +17,33 @@ const NAV = [
   { href: "/admin/closing", label: "レジ締め" },
   { href: "/admin/imports", label: "CSVインポート" },
   { href: "/admin/products", label: "商品管理" },
+  { href: "/admin/products/photos", label: "商品写真" },
   { href: "/admin/qr", label: "QRオーダー" },
   { href: "/admin/settings", label: "営業設定" },
-  { href: "/waiter", label: "ウェイター" },
-];
+] as const;
+
+const OPS = [
+  { href: "/waiter/tables", label: "ウェイター" },
+  { href: "/kitchen", label: "キッチンモニター" },
+  { href: "/waiter/connect", label: "接続ガイド" },
+] as const;
 
 function isActive(pathname: string, href: string) {
   if (href === "/admin/dashboard") return pathname === href;
+  if (href === "/admin/products") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function AdminNav() {
   const pathname = usePathname();
+  const [storeName, setStoreName] = useState("あづま家");
   const [hoursLabel, setHoursLabel] = useState("読み込み中…");
 
   useEffect(() => {
     fetch("/api/admin/store")
       .then((r) => r.json())
       .then((s) => {
+        if (typeof s.name === "string" && s.name.trim()) setStoreName(s.name.trim());
         const closed = formatClosedDaysLabel(s.regularClosedDays);
         setHoursLabel(`${s.openTime ?? "11:00"} – ${s.closeTime ?? "18:00"}\n${closed}`);
       })
@@ -44,10 +53,10 @@ export function AdminNav() {
   const [hoursLine, closedLine] = hoursLabel.split("\n");
 
   return (
-    <aside className="admin-sidebar w-full shrink-0 md:w-52 lg:w-56">
+    <aside className="admin-sidebar w-full shrink-0 print:hidden md:w-52 lg:w-56">
       <div className="px-6 pb-2 pt-8 md:pt-10">
         <p className="admin-brand-serif text-[1.35rem] leading-tight tracking-wide text-[var(--admin-ink)]">
-          喫茶店
+          {storeName}
         </p>
         <p className="mt-1 text-[11px] tracking-[0.2em] text-[var(--admin-muted)]">管理</p>
         <p className="mt-4 border-t border-[var(--admin-line)] pt-4 text-[11px] leading-relaxed text-[var(--admin-muted)]">
@@ -69,19 +78,34 @@ export function AdminNav() {
             </Link>
           );
         })}
+        <div className="mt-3 hidden border-t border-[var(--admin-line)] pt-3 md:block">
+          <p className="mb-1 px-2 text-[10px] tracking-[0.18em] text-[var(--admin-muted)]">店舗画面</p>
+          {OPS.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="admin-nav-link whitespace-nowrap"
+            >
+              {item.label} ↗
+            </a>
+          ))}
+        </div>
+        <div className="flex gap-0.5 md:hidden">
+          {OPS.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="admin-nav-link whitespace-nowrap"
+            >
+              {item.label}
+            </a>
+          ))}
+        </div>
       </nav>
-      <div className="px-4 pb-8 md:px-6">
-        <button
-          type="button"
-          onClick={async () => {
-            await fetch("/api/auth/login", { method: "DELETE" });
-            window.location.href = "/admin/login";
-          }}
-          className="w-full rounded-lg border border-[var(--admin-line)] px-3 py-2 text-left text-xs text-[var(--admin-muted)] hover:border-[var(--admin-accent)] hover:text-[var(--admin-ink)]"
-        >
-          ログアウト
-        </button>
-      </div>
     </aside>
   );
 }

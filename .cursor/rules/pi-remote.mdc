@@ -1,0 +1,62 @@
+---
+description: Raspberry Pi 店舗サーバー（azumaya-pos）を Cursor から SSH で操作・デバッグ・更新する
+alwaysApply: true
+---
+
+# Cafe POS Raspberry Pi リモート操作
+
+店舗の本番サーバーは Raspberry Pi（`azumaya-pos` / `/opt/cafe-pos`）。
+DB は **システム PostgreSQL :5432**（埋め込みPGは使わない）。
+
+## 接続（鍵認証・パスワード不要）
+
+```bash
+ssh azumaya-pos
+# または Cursor で開く
+npm run pi:open
+```
+
+Cursor UI:
+1. `Cmd+Shift+P` → **Remote-SSH: Connect to Host**
+2. `azumaya-pos` を選択
+3. フォルダ **`/opt/cafe-pos`** を開く
+
+IPが変わったら（店のWi‑Fiなど）: `npm run pi:ssh-update`
+
+## 安定運用の正本
+
+詳細は `OPS-STABLE.md`。要点:
+- **本番の正は Pi のみ**（Mac店舗サーバーと同時会計しない）
+- 更新は閉店後。営業中は `pi:restart` 優先
+- 日次バックアップ必須
+
+## 遠隔デバッグ
+
+```bash
+npm run pi:status          # ヘルス・IP・直近backup
+npm run pi:logs            # 直近ログ
+npm run pi:restart         # サービス再起動
+npm run pi:backup          # 今すぐ DB dump
+npm run pi:backup-pull     # Mac へ最新 dump を取得
+ssh azumaya-pos 'sudo journalctl -u cafe-pos-shop -f'
+```
+
+## 遠隔アップデート（2通り）
+
+### A. Mac → Pi（閉店後）
+
+```bash
+npm run pi:deploy
+```
+
+### B. Remote-SSH で Pi 上を直接編集
+
+```bash
+bash scripts/pi-apply.sh
+```
+
+## 注意
+
+- パスワードをリポジトリに書かない
+- 印刷は店内LANの TM-m30（`printer-config.json`）
+- IP変更時: `npm run pi:ssh-update`

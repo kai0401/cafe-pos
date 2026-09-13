@@ -1,10 +1,74 @@
-import { DataSource, Prisma, TransactionType } from "@prisma/client";
+import { DataSource, OrderItemStatus, OrderStatus, Prisma, TransactionType } from "@prisma/client";
 import { aggregateSales } from "@/domain/import/import-service";
-import { getBusinessDate } from "@/lib/datetime";
+import { formatJSTToday, getBusinessDate } from "@/lib/datetime";
 import { PAYMENT_LABELS } from "@/lib/format";
+import { groupOrderItemsForDisplay } from "@/lib/order-modifiers";
 import { buildClosingReport, sendToPrinter } from "@/lib/printer/print-service";
 import { loadPrinterConfig } from "@/lib/printer/printer-config";
 import { prisma } from "@/lib/prisma";
+
+const OPEN_HISTORY_STATUSES: OrderStatus[] = [
+  OrderStatus.OPEN,
+  OrderStatus.SENT_TO_KITCHEN,
+  OrderStatus.READY,
+];
+
+function openOrderTotal(
+  items: {
+    id: string;
+    productId: string;
+    productName: string;
+    unitPrice: number;
+    quantity: number;
+    status: string;
+    note: string | null;
+    createdAt: Date;
+  }[],
+) {
+  return groupOrderItemsForDisplay(
+    items.map((i) => ({
+      id: i.id,
+      productId: i.productId,
+      productName: i.productName,
+      unitPrice: i.unitPrice,
+      quantity: i.quantity,
+      status: i.status,
+      note: i.note,
+      createdAt: i.createdAt.toISOString(),
+    })),
+  ).reduce((s, i) => s + i.lineTotal, 0);
+}
+
+/** 未会計の注文（オーダー時点）を履歴集計用に返す */
+export async function getOpenOrderHistoryRows(storeId: string) {
+  const orders = await prisma.order.findMany({
+    where: {
+      storeId,
+      status: { in: OPEN_HISTORY_STATUSES },
+      items: { some: { status: { not: OrderItemStatus.CANCELLED } } },
+    },
+    select: {
+      createdAt: true,
+      items: {
+        where: { status: { not: OrderItemStatus.CANCELLED } },
+        select: {
+          id: true,
+          productId: true,
+          productName: true,
+          unitPrice: true,
+          quantity: true,
+          status: true,
+          note: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+  return orders.map((o) => ({
+    createdAt: o.createdAt,
+    totalAmount: openOrderTotal(o.items),
+  }));
+}
 
 /**
  * 会計済み取引の取消（返金）。
@@ -50,7 +114,10 @@ export async function refundTransaction(transactionId: string, storeId: string) 
       customerCount: 0,
       eatInType: original.eatInType,
       staffName: original.staffName,
+      customerSegment: original.customerSegment,
       tableNumber: original.tableNumber,
+      tableName: original.tableName,
+      entryTime: original.entryTime,
     },
   });
 
@@ -101,16 +168,19 @@ export async function getTransactionsForDate(storeId: string, dateStr: string) {
       .map((t) => t.externalId.replace(/^refund-/, "")),
   );
 
-  return transactions.map((tx) => ({
+  const paidRows = transactions.map((tx) => ({
     id: tx.id,
     externalId: tx.externalId,
     dataSource: tx.dataSource,
     transactionType: tx.transactionType,
     transactionAt: tx.transactionAt.toISOString(),
+    entryTime: tx.entryTime?.toISOString() ?? null,
     totalAmount: tx.totalAmount,
     customerCount: tx.customerCount,
     tableNumber: tx.tableNumber,
+    tableName: tx.tableName,
     staffName: tx.staffName,
+    customerSegment: tx.customerSegment,
     payments: tx.payments.map((p) => ({ method: p.method, amount: p.amount })),
     items: tx.items.map((i) => ({
       name: i.productName,
@@ -122,7 +192,66 @@ export async function getTransactionsForDate(storeId: string, dateStr: string) {
       tx.dataSource === DataSource.OWN_POS &&
       tx.transactionType === TransactionType.SALE &&
       !refundedIds.has(tx.externalId),
+    openOrder: false as const,
   }));
+
+  const dayStart = new Date(`${dateStr}T00:00:00+09:00`);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const isToday = dateStr === formatJSTToday();
+  const openOrders = await prisma.order.findMany({
+    where: {
+      storeId,
+      status: { in: OPEN_HISTORY_STATUSES },
+      // 本日は現在の未会計すべて。過去日は当日開始の未会計のみ
+      ...(isToday ? {} : { createdAt: { gte: dayStart, lt: dayEnd } }),
+      items: { some: { status: { not: OrderItemStatus.CANCELLED } } },
+    },
+    include: {
+      table: true,
+      items: { where: { status: { not: OrderItemStatus.CANCELLED } } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const openRows = openOrders.map((order) => {
+    const displayItems = groupOrderItemsForDisplay(
+      order.items.map((i) => ({
+        id: i.id,
+        productId: i.productId,
+        productName: i.productName,
+        unitPrice: i.unitPrice,
+        quantity: i.quantity,
+        status: i.status,
+        note: i.note,
+        createdAt: i.createdAt.toISOString(),
+      })),
+    );
+    return {
+      id: order.id,
+      externalId: `order-${order.orderNumber}`,
+      dataSource: DataSource.OWN_POS,
+      transactionType: "ORDER",
+      transactionAt: order.createdAt.toISOString(),
+      entryTime: order.createdAt.toISOString(),
+      totalAmount: displayItems.reduce((s, i) => s + i.lineTotal, 0),
+      customerCount: order.customerCount,
+      tableNumber: order.table.number,
+      tableName: order.table.name,
+      staffName: order.staffName,
+      customerSegment: order.customerSegment,
+      payments: [] as { method: string; amount: number }[],
+      items: displayItems.map((i) => ({
+        name: i.displayName,
+        quantity: i.quantity,
+        totalAmount: i.lineTotal,
+      })),
+      refunded: false,
+      canRefund: false,
+      openOrder: true as const,
+    };
+  });
+
+  return [...openRows, ...paidRows].sort((a, b) => b.transactionAt.localeCompare(a.transactionAt));
 }
 
 export type DailyClosingSummary = {
@@ -198,7 +327,7 @@ export async function getDailyClosing(storeId: string, dateStr?: string): Promis
   };
 }
 
-/** レジ締め実行: スナップショット保存 + TM-m30 で締めレポート印刷 */
+/** レジ締め実行: スナップショット保存 + スマレジ互換CSV保管 + TM-m30 で締めレポート印刷 */
 export async function executeDailyClosing(storeId: string) {
   const summary = await getDailyClosing(storeId);
 
@@ -216,6 +345,15 @@ export async function executeDailyClosing(storeId: string) {
       payload: summary as unknown as Prisma.InputJsonValue,
     },
   });
+
+  let archiveDir: string | null = null;
+  try {
+    const { archiveSmaregiCsvFiles } = await import("@/domain/export/smaregi-archive");
+    const archived = await archiveSmaregiCsvFiles({ storeId, businessDate });
+    if (archived.ok && archived.dir) archiveDir = archived.dir;
+  } catch (err) {
+    console.error("[closing] スマレジCSV保管に失敗:", err instanceof Error ? err.message : err);
+  }
 
   const config = loadPrinterConfig();
   let printed = false;
@@ -240,6 +378,7 @@ export async function executeDailyClosing(storeId: string) {
           config.cols,
         ),
         config,
+        "closing",
       );
       printed = true;
     } catch (err) {
@@ -247,5 +386,10 @@ export async function executeDailyClosing(storeId: string) {
     }
   }
 
-  return { ...summary, closedAt: new Date().toISOString(), printed };
+  return {
+    ...summary,
+    closedAt: new Date().toISOString(),
+    printed,
+    smaregiArchiveDir: archiveDir,
+  };
 }

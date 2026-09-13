@@ -7,7 +7,7 @@ import { detectPlatform, isInAppBrowser, isStandalone } from "@/lib/pwa-install"
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-4 border-b border-stone-800 py-5 last:border-b-0">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[15px] font-bold text-stone-900">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--pos-accent)] text-[15px] font-bold text-white">
         {n}
       </span>
       <div className="min-w-0 flex-1">
@@ -31,8 +31,8 @@ export default function KitchenInstallPage() {
 
   return (
     <div className="min-h-screen bg-stone-950 pb-8 text-white">
-      <header className="kitchen-top-bar sticky top-0 z-20 flex shrink-0 items-center bg-stone-900 px-3">
-        <Link href="/kitchen/open" className="kitchen-header-btn min-w-[72px] text-[15px] text-amber-400">
+      <header className="kitchen-top-bar sticky top-0 z-20 flex shrink-0 items-center bg-[var(--pos-accent)] px-3">
+        <Link href="/kitchen/open" className="kitchen-header-btn min-w-[72px] text-[15px] text-white">
           ‹ 戻る
         </Link>
         <h1 className="flex-1 text-center text-[16px] font-semibold">アプリに追加</h1>

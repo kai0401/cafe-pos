@@ -45,21 +45,7 @@ async function main() {
     warn("PUBLIC_BASE_URL", "ローカル開発では任意");
   }
 
-  if (cloud && process.env.ADMIN_PIN?.trim()) {
-    pass("ADMIN_PIN", "設定済み");
-  } else if (cloud) {
-    fail("ADMIN_PIN", "クラウド本番では管理画面PINが必須です");
-  } else {
-    warn("ADMIN_PIN", "ローカルでは任意");
-  }
-
-  if (cloud && process.env.STAFF_PIN?.trim()) {
-    pass("STAFF_PIN", "設定済み");
-  } else if (cloud) {
-    fail("STAFF_PIN", "クラウド本番ではスタッフPINが必須です");
-  } else {
-    warn("STAFF_PIN", "ローカルでは任意");
-  }
+  pass("ログイン", "廃止（PIN 認証なし）");
 
   try {
     await prisma.$connect();

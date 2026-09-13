@@ -241,6 +241,10 @@ model Product {
   costAmount    Int?          @map("cost_amount")
   sortOrder     Int           @default(0) @map("sort_order")
   dataSource    DataSource    @default(SMAREGI) @map("data_source")
+  imagePath     String?       @map("image_path")
+  showOnQr      Boolean       @default(true) @map("show_on_qr")
+  showOnWaiter  Boolean       @default(true) @map("show_on_waiter")
+  isTopping     Boolean       @default(false) @map("is_topping")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
@@ -249,6 +253,7 @@ model Product {
   externalMapping ExternalProductMapping[]
   salesItems      SalesTransactionItem[]
   orderItems      OrderItem[]
+  imageBlob       ProductImageBlob?
 
   @@map("products")
 }
@@ -454,6 +459,7 @@ model SalesTransaction {
   customerCount    Int             @default(1) @map("customer_count")
   eatInType        EatInType       @default(DINE_IN) @map("eat_in_type")
   staffName        String?         @map("staff_name")
+  customerSegment  String?         @map("customer_segment")
   tableNumber      Int?            @map("table_number")
   tableName        String?         @map("table_name")
   entryTime        DateTime?       @map("entry_time")
@@ -639,6 +645,19 @@ model ReceiptBlob {
   @@map("receipt_blobs")
 }
 
+model ProductImageBlob {
+  id        String   @id @default(cuid())
+  productId String   @unique @map("product_id")
+  data      Bytes
+  mimeType  String   @default("image/jpeg") @map("mime_type")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_image_blobs")
+}
+
 model StaffMember {
   id         String    @id @default(cuid())
   storeId    String    @map("store_id")
@@ -677,4 +696,40 @@ model Shift {
   @@index([storeId, shiftDate])
   @@index([staffId, shiftDate])
   @@map("shifts")
+}
+
+/** オフライン再送などの冪等キー */
+model IdempotencyKey {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  storeId   String   @map("store_id")
+  response  String
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+enum PrintJobStatus {
+  PENDING
+  PRINTING
+  DONE
+  FAILED
+}
+
+/** クラウド運用時の印刷キュー。店舗 Mac の印刷エージェントが取り出して TM-m30 に送る */
+model PrintJob {
+  id        String         @id @default(cuid())
+  kind      String         @default("print")
+  data      Bytes
+  status    PrintJobStatus @default(PENDING)
+  attempts  Int            @default(0)
+  error     String?
+  createdAt DateTime       @default(now()) @map("created_at")
+  claimedAt DateTime?      @map("claimed_at")
+  printedAt DateTime?      @map("printed_at")
+
+  @@index([status, createdAt])
+  @@map("print_jobs")
 }

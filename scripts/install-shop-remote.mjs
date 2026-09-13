@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * どこでも接続用 HTTPS トンネルを常駐起動（macOS LaunchAgent）
+ * お客様QR・管理画面用 HTTPS トンネルを常駐起動（macOS LaunchAgent）
  */
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
@@ -14,6 +14,7 @@ const label = "com.cafe-pos.tunnel";
 const plistPath = path.join(os.homedir(), "Library", "LaunchAgents", `${label}.plist`);
 const logDir = path.join(root, ".preview-logs");
 const nodeBin = process.execPath;
+const nodeDir = path.dirname(nodeBin);
 const tunnelScript = path.join(root, "scripts", "shop-tunnel.mjs");
 
 async function run(cmd, args) {
@@ -50,7 +51,9 @@ async function main() {
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    <string>${nodeDir}:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    <key>PORT</key>
+    <string>3000</string>
   </dict>
 </dict>
 </plist>
@@ -66,13 +69,11 @@ async function main() {
   }
   await run("launchctl", ["bootstrap", `gui/${process.getuid()}`, plistPath]);
 
-  console.log("\n🌐 どこでも接続トンネルを起動しました\n");
-  console.log("URL 取得まで 30〜60 秒かかります。以下で確認:\n");
+  console.log("\nお客様QR・管理画面用トンネルを起動しました\n");
+  console.log("URL 取得まで 30〜60 秒。確認:");
   console.log(`  tail -f ${path.join(logDir, "shop-tunnel.log")}`);
-  console.log("  または http://192.168.11.60:3001/waiter/connect\n");
-  console.log("📱 iPhone（LTE・外出先）: /waiter/connect → HTTPS URL");
-  console.log("🍳 iPad キッチン: /kitchen/connect → QR 読み取り → ホーム画面に追加\n");
-  console.log(`停止: launchctl bootout gui/$(id -u) ${plistPath}\n`);
+  console.log("  または /admin/qr\n");
+  console.log("停止: launchctl bootout gui/$(id -u) " + plistPath + "\n");
 }
 
 main().catch((err) => {
