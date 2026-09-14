@@ -5,6 +5,7 @@ import { formatJST, formatJSTToday, getBusinessDate, parseExpenseDate } from "@/
 import { isCloudRuntime, isPrinterSupported } from "@/lib/runtime-config";
 import { loadPrinterConfig } from "@/lib/printer/printer-config";
 import { prisma, getDefaultStore } from "@/lib/prisma";
+import { getRemoteBaseUrl } from "@/lib/remote-url";
 import { STORE_LOCATION } from "@/lib/store-location";
 import net from "node:net";
 import os from "node:os";
@@ -20,6 +21,10 @@ export type OpsSnapshot = {
   db: "ok" | "error";
   hostname: string | null;
   lanIp: string | null;
+  /** お客様LTE向け（cloudflared 等）。印刷QRの転送先 */
+  shopPublicUrl: string | null;
+  /** 印刷に使う固定URL（通常は Vercel PUBLIC_BASE_URL） */
+  qrPrintUrl: string | null;
   setup: { ready: boolean; products: number; tables: number };
   sales: {
     businessDate: string;
@@ -358,6 +363,8 @@ export async function buildLiveOpsSnapshot(): Promise<OpsSnapshot> {
     db,
     hostname: os.hostname(),
     lanIp: lanIp(),
+    shopPublicUrl: cloud ? null : ((await getRemoteBaseUrl()) ?? null),
+    qrPrintUrl: process.env.PUBLIC_BASE_URL?.trim().replace(/\/$/, "") || null,
     setup,
     sales,
     floor,
@@ -408,6 +415,9 @@ export async function buildHeartbeatOpsSnapshot(): Promise<OpsSnapshot | null> {
     db: payload.db === "error" ? "error" : "ok",
     hostname: hb.hostname ?? payload.hostname ?? null,
     lanIp: hb.lanIp ?? payload.lanIp ?? null,
+    shopPublicUrl: payload.shopPublicUrl ?? null,
+    qrPrintUrl:
+      payload.qrPrintUrl ?? process.env.PUBLIC_BASE_URL?.trim().replace(/\/$/, "") ?? null,
     setup: payload.setup ?? { ready: false, products: 0, tables: 0 },
     sales: payload.sales ?? null,
     floor: payload.floor ?? { occupiedTables: 0, emptyTables: 0, openOrders: 0 },

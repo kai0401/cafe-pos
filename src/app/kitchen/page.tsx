@@ -173,50 +173,53 @@ export default function KitchenPage() {
 
   return (
     <div className="min-h-screen bg-stone-950 pb-safe text-white">
-      <div className="kitchen-top-bar sticky top-0 z-20 flex items-center justify-between bg-[var(--pos-accent)] px-5 text-white">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-[28px] font-black tracking-tight">キッチン</h1>
-          <span className="rounded-full bg-white/20 px-3 py-1.5 text-[16px] font-bold">
+      <div className="kitchen-top-bar sticky top-0 z-20 flex items-center justify-between bg-[var(--pos-accent)] px-3 text-white md:px-5">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          <h1 className="text-[18px] font-black tracking-tight md:text-[28px]">キッチン</h1>
+          <span className="rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-bold md:px-3 md:py-1.5 md:text-[16px]">
             未完了 {waitingCount}
           </span>
-          <span className="rounded-full bg-white/20 px-3 py-1.5 text-[16px] font-bold">
+          <span className="rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-bold md:px-3 md:py-1.5 md:text-[16px]">
             提供待ち {readyCount}
           </span>
-          <span className="rounded-full bg-white/15 px-3 py-1.5 text-[14px] text-white/90">
+          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] text-white/90 md:px-3 md:py-1.5 md:text-[14px]">
             目標 {KITCHEN_SERVE_TARGET_MINUTES}分
           </span>
         </div>
-        <div className="flex shrink-0 gap-3">
+        <div className="flex shrink-0 gap-2 md:gap-3">
           <button
             type="button"
             onClick={() => void load()}
-            className="kitchen-header-btn min-w-[48px] text-[17px] text-white"
+            className="kitchen-header-btn min-w-[44px] text-[14px] text-white md:min-w-[48px] md:text-[17px]"
           >
             ↻ 更新
           </button>
-          <Link href="/kitchen/connect" className="kitchen-header-btn text-[17px] text-white/90">
+          <Link
+            href="/kitchen/connect"
+            className="kitchen-header-btn text-[14px] text-white/90 md:text-[17px]"
+          >
             接続
           </Link>
         </div>
       </div>
 
       {connectionError && (
-        <div className="mx-4 mt-3 rounded-xl bg-red-600 px-4 py-4 text-center text-[18px] font-bold">
+        <div className="mx-3 mt-3 rounded-xl bg-red-600 px-3 py-3 text-center text-[14px] font-bold md:mx-4 md:px-4 md:py-4 md:text-[18px]">
           ⚠ サーバーに接続できません。新しい注文が表示されていない可能性があります
         </div>
       )}
 
       {!initialLoaded && tickets.length === 0 && (
-        <div className="mt-32 flex flex-col items-center gap-4">
-          <div className="h-9 w-9 animate-spin rounded-full border-2 border-stone-700 border-t-[var(--pos-accent)]" />
-          <p className="text-[20px] text-stone-500">キッチンに接続中…</p>
+        <div className="mt-24 flex flex-col items-center gap-3 md:mt-32 md:gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-stone-700 border-t-[var(--pos-accent)] md:h-9 md:w-9" />
+          <p className="text-[15px] text-stone-500 md:text-[20px]">キッチンに接続中…</p>
         </div>
       )}
 
       {initialLoaded && tickets.length === 0 && (
-        <div className="mt-32 flex flex-col items-center gap-3 text-center">
-          <p className="text-[28px] font-bold text-stone-500">注文待ちはありません</p>
-          <p className="text-[16px] text-stone-600">
+        <div className="mt-24 flex flex-col items-center gap-2 text-center md:mt-32 md:gap-3">
+          <p className="text-[18px] font-bold text-stone-500 md:text-[28px]">注文待ちはありません</p>
+          <p className="text-[13px] text-stone-600 md:text-[16px]">
             新しい注文は自動で表示されます
             {lastUpdated &&
               ` · 最終更新 ${lastUpdated.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`}
@@ -237,37 +240,47 @@ export default function KitchenPage() {
                 type="button"
                 disabled={busy}
                 onClick={() => void advanceStatus(ticket)}
-                className={`flex w-full items-stretch px-5 py-5 text-left disabled:opacity-50 ${
+                className={`flex w-full items-stretch px-3 py-3 text-left disabled:opacity-50 md:px-5 md:py-5 ${
                   ready ? "bg-emerald-950/40" : "bg-stone-950"
                 }`}
               >
-                <div className="w-[96px] shrink-0">
-                  <p className="text-[32px] font-black leading-none">{ticket.orderItem.order.table.name}</p>
-                  <p className="mt-2 text-[15px] tabular-nums text-stone-500">
+                <div className="w-[64px] shrink-0 md:w-[96px]">
+                  <p className="text-[20px] font-black leading-none md:text-[32px]">
+                    {ticket.orderItem.order.table.name}
+                  </p>
+                  <p className="mt-1.5 text-[12px] tabular-nums text-stone-500 md:mt-2 md:text-[15px]">
                     {new Date(ticket.queuedAt).toLocaleTimeString("ja-JP", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
                   </p>
                 </div>
-                <div className="min-w-0 flex-1 px-4">
-                  <p className="text-[28px] font-bold leading-snug">
+                <div className="min-w-0 flex-1 px-2.5 md:px-4">
+                  <p className="text-[17px] font-bold leading-snug md:text-[28px]">
                     {ticket.orderItem.productName}
                     {ticket.orderItem.quantity > 1 && (
-                      <span className="ml-2 text-[26px] text-amber-400">×{ticket.orderItem.quantity}</span>
+                      <span className="ml-1.5 text-[16px] text-amber-400 md:ml-2 md:text-[26px]">
+                        ×{ticket.orderItem.quantity}
+                      </span>
                     )}
                   </p>
-                  {note && <p className="mt-2 text-[20px] leading-snug text-amber-300">{note}</p>}
+                  {note && (
+                    <p className="mt-1.5 text-[14px] leading-snug text-amber-300 md:mt-2 md:text-[20px]">
+                      {note}
+                    </p>
+                  )}
                 </div>
-                <div className="flex w-[140px] shrink-0 flex-col items-end justify-center gap-2">
+                <div className="flex w-[96px] shrink-0 flex-col items-end justify-center gap-1.5 md:w-[140px] md:gap-2">
                   <span
-                    className={`rounded-full px-3 py-1.5 text-[16px] font-bold ${
+                    className={`rounded-full px-2 py-1 text-[11px] font-bold md:px-3 md:py-1.5 md:text-[16px] ${
                       ready ? "bg-emerald-500 text-stone-900" : "bg-red-500 text-white"
                     }`}
                   >
                     {ready ? "提供済みにする" : "完了にする"}
                   </span>
-                  <span className={`text-[16px] font-bold tabular-nums ${countdownBadgeClass(countdown.urgency)}`}>
+                  <span
+                    className={`text-[12px] font-bold tabular-nums md:text-[16px] ${countdownBadgeClass(countdown.urgency)}`}
+                  >
                     {countdown.label}
                   </span>
                 </div>

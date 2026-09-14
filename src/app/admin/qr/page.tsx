@@ -232,14 +232,16 @@ export default function QrSheetPage() {
 
         {baseUrl && !lteReady && (
           <p className="mb-4 rounded-lg border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            いまのQRは店内Wi‑Fi向けです（<code className="break-all">{baseUrl}</code>）。
-            お客様の携帯回線から使う場合はトンネルまたは Vercel の公開URLが必要です。
+            いまのQRは店内向けです（<code className="break-all">{baseUrl}</code>）。
+            お客様は携帯回線のまま使う想定なので、Pi のトンネル（cafe-pos-tunnel）と
+            PUBLIC_BASE_URL（Vercel固定）を有効にしてから印刷してください。
           </p>
         )}
 
         {baseUrl && lteReady && (
           <p className="mb-4 rounded-lg border border-[var(--admin-sage)]/30 bg-[rgba(90,140,110,0.08)] px-4 py-3 text-sm text-[var(--admin-ink)]">
-            QRの公開先（LTE可）: <code className="break-all">{baseUrl}</code>
+            印刷するQRは固定URL（お客様はLTEのまま可）:{" "}
+            <code className="break-all">{baseUrl}</code>
           </p>
         )}
 

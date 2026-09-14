@@ -54,6 +54,7 @@
     "pi:backup": "bash scripts/pi-remote.sh backup",
     "pi:backup-pull": "bash scripts/pi-remote.sh backup-pull",
     "pi:ssh-update": "bash scripts/pi-update-ssh-host.sh",
+    "pi:tunnel-install": "bash scripts/pi-remote.sh tunnel-install",
     "pi:open": "bash scripts/pi-open-cursor.sh"
   },
   "dependencies": {

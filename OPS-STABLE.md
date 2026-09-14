@@ -11,7 +11,14 @@
 | **本番（正）** | Pi `/opt/cafe-pos` + システムPG `:5432` | ウェイター・キッチン・会計・印刷 |
 | **開発** | Mac の `cafe-pos` | 機能開発。反映は `npm run pi:deploy` |
 | **遠隔メンテ** | Cursor Remote-SSH → `azumaya-pos` | ログ・修正・再起動 |
-| **クラウド** | Vercel + Neon | 店外QR／災害時予備。**通常営業では使わない** |
+| **クラウド** | Vercel + Neon | **印刷QRの固定入口**（心拍のPiトンネルへ転送）・遠隔モニター。会計DBの正は Pi |
+
+お客様QR（LTE・店Wi‑Fi不要）:
+1. 印刷URLは常に `https://azumaya-pos.vercel.app/qr/...`（貼り替え不要）
+2. Pi の `cafe-pos-tunnel` が HTTPS トンネルを維持し心拍でURLを通知
+3. Vercel が最新トンネルへリダイレクト → 注文は Pi DB に入る
+
+スタッフは従来どおり LAN（`http://192.168.1.93:3000/...`）。
 
 禁止:
 - 営業中に Mac 店舗サーバーと Pi を同時起動して会計する

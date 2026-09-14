@@ -22,6 +22,8 @@ type OpsSnapshot = {
   db: "ok" | "error";
   hostname: string | null;
   lanIp: string | null;
+  shopPublicUrl?: string | null;
+  qrPrintUrl?: string | null;
   note?: string;
   setup: { ready: boolean; products: number; tables: number };
   sales: {
@@ -347,6 +349,17 @@ export default function MonitorPage() {
                   {data.lanIp ? ` · ${data.lanIp}` : ""}
                   <br />
                   商品 {data.setup.products} · 卓 {data.setup.tables}
+                </p>
+              </Card>
+
+              <Card
+                title="お客様QR（LTE）"
+                tone={data.shopPublicUrl ? "ok" : "warn"}
+              >
+                <p className="text-[13px] leading-relaxed text-stone-700">
+                  印刷入口: {data.qrPrintUrl ?? "https://azumaya-pos.vercel.app"}
+                  <br />
+                  転送先: {data.shopPublicUrl ?? "トンネル未接続"}
                 </p>
               </Card>
 

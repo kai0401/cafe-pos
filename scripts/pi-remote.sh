@@ -65,11 +65,15 @@ case "$cmd" in
   wifi-list)
     remote 'nmcli device wifi list 2>/dev/null || sudo iwlist wlan0 scan 2>/dev/null | head -40'
     ;;
+  tunnel-install)
+    # 先にコード同期（tunnel script / bridge）が必要な場合は deploy 後に実行
+    remote 'bash /opt/cafe-pos/scripts/pi-install-tunnel.sh'
+    ;;
   ip)
     remote 'hostname -I'
     ;;
   *)
-    echo "使い方: $0 status|health|logs|restart|shell|deploy|backup|backup-pull|wifi-list|ip"
+    echo "使い方: $0 status|health|logs|restart|shell|deploy|backup|backup-pull|wifi-list|tunnel-install|ip"
     exit 1
     ;;
 esac

@@ -1,26 +1,34 @@
 #!/usr/bin/env bash
-# mDNS / 現在のIPで ~/.ssh/config の Host azumaya-pos を更新
+# mDNS / 引数IP / 環境変数で ~/.ssh/config の Host azumaya-pos を更新
+# 使い方:
+#   npm run pi:ssh-update
+#   bash scripts/pi-update-ssh-host.sh 192.168.1.50
+#   PI_HOST=192.168.1.50 npm run pi:ssh-update
 set -euo pipefail
 
 CONFIG="$HOME/.ssh/config"
 NAME="azumaya-pos"
 USER_NAME="adumaya"
 
-IP=""
-# Try local hostname first
-if ping -c 1 -W 2000 "${NAME}.local" >/dev/null 2>&1; then
-  IP="$(dscacheutil -q host -a name "${NAME}.local" 2>/dev/null | awk '/ip_address:/{print $2; exit}')"
-fi
+IP="${1:-${PI_HOST:-}}"
+
 if [ -z "$IP" ]; then
-  IP="$(ping -c 1 -W 2000 "${NAME}.local" 2>/dev/null | sed -n 's/.*(\([0-9.]*\)).*/\1/p' | head -1)"
+  if ping -c 1 -W 2000 "${NAME}.local" >/dev/null 2>&1; then
+    IP="$(dscacheutil -q host -a name "${NAME}.local" 2>/dev/null | awk '/ip_address:/{print $2; exit}')"
+  fi
+  if [ -z "$IP" ]; then
+    IP="$(ping -c 1 -W 2000 "${NAME}.local" 2>/dev/null | sed -n 's/.*(\([0-9.]*\)).*/\1/p' | head -1)"
+  fi
 fi
 
 if [ -z "$IP" ]; then
-  echo "✗ ${NAME}.local が見つかりません。同じWi‑Fi／有線か確認してください。"
+  echo "✗ Pi のIPが分かりません。"
+  echo "  ルーター管理画面で hostname「azumaya-pos」のIPを確認し:"
+  echo "  bash scripts/pi-update-ssh-host.sh 192.168.x.x"
   exit 1
 fi
 
-echo "→ ${NAME}.local = $IP"
+echo "→ ${NAME} = $IP"
 
 python3 - <<PY
 from pathlib import Path
@@ -48,7 +56,6 @@ Host ${NAME}
   ServerAliveInterval 30
   ServerAliveCountMax 3
 """
-# trim trailing blank then append
 while out and out[-1].strip() == "":
     out.pop()
 out.append("\n" + block.lstrip("\n"))
@@ -56,4 +63,4 @@ p.write_text("".join(out))
 print("updated ~/.ssh/config Host ${NAME} → ${IP}")
 PY
 
-ssh -o BatchMode=yes -o ConnectTimeout=5 "$NAME" "echo OK; hostname; hostname -I"
+ssh -o BatchMode=yes -o ConnectTimeout=8 "$NAME" "echo OK; hostname; hostname -I; systemctl is-active cafe-pos-shop postgresql; curl -sS -m 5 http://127.0.0.1:3000/api/health; echo"

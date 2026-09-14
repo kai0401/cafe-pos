@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * 店舗サーバーを HTTPS で公開 — お客様QR・管理画面は携帯回線から接続。
+ * 店舗サーバーを HTTPS で公開 — お客様QRは携帯回線から接続。
  * ウェイター / キッチンはお店の Wi-Fi（LAN）を使う。
- * Mac 常駐（launchd）で動かす想定。
+ * Pi: systemd cafe-pos-tunnel
+ *
+ * 印刷QRは PUBLIC_BASE_URL（Vercel固定）。クラウドがトンネルURLへ転送する。
  */
-import { appendFile, mkdir, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import net from "node:net";
 import path from "node:path";
@@ -35,6 +37,19 @@ async function detectPort() {
   return preferred;
 }
 
+async function loadEnvFile() {
+  try {
+    const raw = await readFile(path.join(root, ".env"), "utf8");
+    for (const line of raw.split("\n")) {
+      const m = line.match(/^([A-Z0-9_]+)="?([^"\n]*)"?\s*$/);
+      if (!m) continue;
+      if (!process.env[m[1]]) process.env[m[1]] = m[2];
+    }
+  } catch {
+    // ignore
+  }
+}
+
 async function saveRemoteUrl(url) {
   const payload = { url, updatedAt: new Date().toISOString() };
   await writeFile(remoteFile, JSON.stringify(payload, null, 2));
@@ -58,24 +73,61 @@ async function waitForServer(port) {
   return false;
 }
 
+async function pushHeartbeatSoon(port) {
+  const cloudUrl = (process.env.OPS_CLOUD_URL || "").replace(/\/$/, "");
+  const key = process.env.OPS_HEARTBEAT_KEY || "";
+  if (!cloudUrl || !key || key.length < 8) return;
+  try {
+    await new Promise((r) => setTimeout(r, 800));
+    const snapRes = await fetch(`http://127.0.0.1:${port}/api/ops/snapshot`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!snapRes.ok) return;
+    const snapshot = await snapRes.json();
+    const res = await fetch(`${cloudUrl}/api/ops/heartbeat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-ops-key": key,
+      },
+      body: JSON.stringify({ ...snapshot, source: "pi-tunnel" }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) console.log(`[tunnel] 心拍更新 OK → ${cloudUrl}`);
+    else console.warn(`[tunnel] 心拍更新失敗 HTTP ${res.status}`);
+  } catch (err) {
+    console.warn(`[tunnel] 心拍更新エラー: ${err?.message ?? err}`);
+  }
+}
+
+function spawnCloudflared(port) {
+  const bin = process.env.CLOUDFLARED_BIN || "cloudflared";
+  const args = ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`];
+  try {
+    return spawn(bin, args, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+  } catch {
+    return spawn(
+      "npx",
+      ["--yes", "cloudflared", "tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`],
+      { cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+    );
+  }
+}
+
 async function startTunnel(port) {
   await mkdir(logDir, { recursive: true });
   await writeFile(logFile, "");
 
   return new Promise((resolve, reject) => {
-    const tunnel = spawn(
-      "npx",
-      ["--yes", "cloudflared", "tunnel", "--url", `http://127.0.0.1:${port}`],
-      { cwd: root, stdio: ["ignore", "pipe", "pipe"] },
-    );
-
+    let tunnel = spawnCloudflared(port);
     let buf = "";
     let resolved = false;
+    let usedNpxFallback = false;
+
     const onData = async (chunk) => {
       const text = chunk.toString();
       buf += text;
       await appendFile(logFile, text).catch(() => {});
-
       const url = extractTunnelUrl(buf);
       if (url && !resolved) {
         resolved = true;
@@ -83,18 +135,43 @@ async function startTunnel(port) {
       }
     };
 
-    tunnel.stdout?.on("data", onData);
-    tunnel.stderr?.on("data", onData);
+    const attach = (child) => {
+      child.stdout?.on("data", onData);
+      child.stderr?.on("data", onData);
+      child.on("exit", (code) => {
+        if (!resolved) {
+          if (!usedNpxFallback && code !== 0) {
+            usedNpxFallback = true;
+            buf = "";
+            tunnel = spawn(
+              "npx",
+              [
+                "--yes",
+                "cloudflared",
+                "tunnel",
+                "--no-autoupdate",
+                "--url",
+                `http://127.0.0.1:${port}`,
+              ],
+              { cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+            );
+            attach(tunnel);
+            return;
+          }
+          reject(new Error(`cloudflared exited (${code})`));
+        }
+      });
+    };
 
-    tunnel.on("exit", (code) => {
-      if (!extractTunnelUrl(buf)) {
-        reject(new Error(`cloudflared exited (${code})`));
-      }
-    });
+    attach(tunnel);
 
     setTimeout(() => {
-      if (!extractTunnelUrl(buf)) {
-        tunnel.kill();
+      if (!resolved) {
+        try {
+          tunnel.kill();
+        } catch {
+          /* ignore */
+        }
         reject(new Error("トンネル URL の取得がタイムアウトしました"));
       }
     }, 120_000);
@@ -102,14 +179,15 @@ async function startTunnel(port) {
 }
 
 async function main() {
+  await loadEnvFile();
   const port = await detectPort();
 
-  console.log("\nCafe POS — お客様・管理画面用 HTTPS トンネル\n");
+  console.log("\nCafe POS — お客様QR用 HTTPS トンネル（Pi）\n");
   console.log(`店舗サーバー (127.0.0.1:${port}) を待機中…`);
 
   const ready = await waitForServer(port);
   if (!ready) {
-    console.error("店舗サーバーが起動していません。先に店内サーバーを起動してください。");
+    console.error("店舗サーバーが起動していません。先に cafe-pos-shop を起動してください。");
     process.exit(1);
   }
 
@@ -119,12 +197,12 @@ async function main() {
     try {
       const { tunnel, url } = await startTunnel(port);
       await saveRemoteUrl(url);
+      void pushHeartbeatSoon(port);
 
-      console.log("お客様（携帯回線）と管理画面（外出先）:\n");
-      console.log(`  QR:    ${url}/qr/...`);
-      console.log(`  管理:  ${url}/admin`);
-      console.log("\nウェイター / キッチンはお店の Wi-Fi の LAN URL を使ってください。\n");
-      console.log("（Mac 再起動後は公開URLが変わることがあります。管理画面の QR ページで確認）\n");
+      console.log("お客様（携帯回線）:");
+      console.log(`  印刷QR入口: ${process.env.PUBLIC_BASE_URL || "(PUBLIC_BASE_URL未設定)"}/qr/...`);
+      console.log(`  トンネル先: ${url}/qr/...`);
+      console.log("ウェイター / キッチンは LAN URL のまま。\n");
 
       await new Promise((resolve) => {
         tunnel.on("exit", () => resolve());
@@ -133,8 +211,8 @@ async function main() {
       console.error(err.message ?? err);
     }
 
-    console.log("トンネル再接続中… (10秒)");
-    await new Promise((r) => setTimeout(r, 10_000));
+    console.log("トンネル再接続中… (8秒)");
+    await new Promise((r) => setTimeout(r, 8_000));
 
     if (!(await isPortListening(port))) {
       console.error("店舗サーバーが停止しました。トンネルも終了します。");
