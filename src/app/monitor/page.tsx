@@ -375,6 +375,17 @@ export default function MonitorPage() {
               </Card>
             </div>
 
+            <div className="rounded-2xl border border-stone-200 bg-white px-4 py-4">
+              <p className="text-[13px] font-medium text-stone-500">売上・取引履歴（遠隔）</p>
+              <Link
+                href="/remote"
+                className="mt-2 inline-flex text-[16px] font-semibold"
+                style={{ color: POS_ACCENT }}
+              >
+                ダッシュボードを開く →
+              </Link>
+            </div>
+
             <p className="pb-8 text-center text-[12px] text-stone-400">
               15秒ごとに自動更新 · 天気は日暮里駅周辺 · 見込みは直近同曜日の平均
             </p>
