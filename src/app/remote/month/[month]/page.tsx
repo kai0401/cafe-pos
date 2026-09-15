@@ -3,9 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { RemoteShell, monthLabel, yen } from "@/components/remote/remote-ui";
+import { RemoteShell, monthLabel, yen, REMOTE_TEAL } from "@/components/remote/remote-ui";
 import { remoteFetch } from "@/lib/remote-api";
-import { POS_ACCENT } from "@/lib/pos-theme";
 
 type DayRow = { date: string; count: number; total: number; isClosedDay: boolean };
 type MonthPayload = {
@@ -52,7 +51,7 @@ export default function RemoteMonthPage() {
         <>
           <div className="mb-4 rounded-2xl bg-white p-5 shadow-sm">
             <p className="text-[13px] text-stone-500">月合計</p>
-            <p className="mt-1 text-[28px] font-bold tabular-nums" style={{ color: POS_ACCENT }}>
+            <p className="mt-1 text-[28px] font-bold tabular-nums" style={{ color: REMOTE_TEAL }}>
               {yen(data.summary.total)}
             </p>
             <p className="mt-1 text-[14px] text-stone-600">{data.summary.count} 件</p>

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { POS_ACCENT } from "@/lib/pos-theme";
+
+export const REMOTE_TEAL = "#1f6f5b";
 
 export function RemoteShell({
   title,
@@ -17,8 +18,8 @@ export function RemoteShell({
   return (
     <div className="min-h-[100dvh] bg-[#f4f2ee] text-stone-900">
       <header
-        className="sticky top-0 z-20 border-b border-stone-200/80 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white"
-        style={{ backgroundColor: POS_ACCENT }}
+        className="sticky top-0 z-20 border-b border-emerald-900/10 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white"
+        style={{ backgroundColor: REMOTE_TEAL }}
       >
         <div className="mx-auto flex max-w-lg items-center gap-3">
           {backHref ? (

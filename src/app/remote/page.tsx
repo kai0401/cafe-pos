@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { RemoteShell, monthLabel, yen } from "@/components/remote/remote-ui";
+import { RemoteShell, monthLabel, yen, REMOTE_TEAL } from "@/components/remote/remote-ui";
 import { remoteFetch } from "@/lib/remote-api";
-import { POS_ACCENT } from "@/lib/pos-theme";
 
 type MonthRow = { month: string; count: number; total: number };
 type TodayRow = {
@@ -80,7 +79,7 @@ export default function RemoteHomePage() {
           className="mb-4 block rounded-2xl bg-white p-5 shadow-sm active:scale-[0.99]"
         >
           <p className="text-[13px] font-medium text-stone-500">本日の売上 · {today.date}</p>
-          <p className="mt-2 text-[32px] font-bold tabular-nums tracking-tight" style={{ color: POS_ACCENT }}>
+          <p className="mt-2 text-[32px] font-bold tabular-nums tracking-tight" style={{ color: REMOTE_TEAL }}>
             {yen(today.total)}
           </p>
           <p className="mt-1 text-[14px] text-stone-600">
@@ -89,7 +88,7 @@ export default function RemoteHomePage() {
               ? ` · 未会計 ${today.openCount}件${typeof today.openTotal === "number" ? `（${yen(today.openTotal)}）` : ""}`
               : ""}
           </p>
-          <p className="mt-3 text-[13px] font-medium" style={{ color: POS_ACCENT }}>
+          <p className="mt-3 text-[13px] font-medium" style={{ color: REMOTE_TEAL }}>
             取引明細を見る →
           </p>
         </Link>
@@ -98,7 +97,7 @@ export default function RemoteHomePage() {
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[15px] font-bold text-stone-800">月次売上</h2>
         <div className="flex items-center gap-3">
-          <Link href="/remote/install" className="text-[13px] font-medium" style={{ color: POS_ACCENT }}>
+          <Link href="/remote/install" className="text-[13px] font-medium" style={{ color: REMOTE_TEAL }}>
             ホーム画面追加
           </Link>
           <Link href="/monitor" className="text-[13px] text-stone-500 underline">

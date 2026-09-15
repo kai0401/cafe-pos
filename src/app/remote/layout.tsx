@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { POS_ACCENT } from "@/lib/pos-theme";
 import { RegisterServiceWorker } from "@/components/pwa/register-service-worker";
 
 export const metadata: Metadata = {
@@ -28,7 +27,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: POS_ACCENT,
+  themeColor: "#1f6f5b",
   viewportFit: "cover",
 };
 

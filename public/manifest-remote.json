@@ -2,13 +2,13 @@
   "name": "あづま家 遠隔売上",
   "short_name": "遠隔売上",
   "description": "日次・月次売上と取引履歴",
-  "id": "/remote",
-  "start_url": "/remote/open",
-  "scope": "/",
+  "id": "https://azumaya-pos.vercel.app/remote",
+  "start_url": "/remote",
+  "scope": "/remote",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#e8912d",
-  "theme_color": "#e8912d",
+  "background_color": "#1f6f5b",
+  "theme_color": "#1f6f5b",
   "lang": "ja",
   "icons": [
     {

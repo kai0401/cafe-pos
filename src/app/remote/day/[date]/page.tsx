@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { RemoteShell, yen } from "@/components/remote/remote-ui";
+import { RemoteShell, yen, REMOTE_TEAL } from "@/components/remote/remote-ui";
 import { remoteFetch } from "@/lib/remote-api";
 import { PAYMENT_LABELS } from "@/lib/format";
-import { POS_ACCENT } from "@/lib/pos-theme";
 
 type Tx = {
   id: string;
