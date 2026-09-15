@@ -8,6 +8,7 @@ const ICONS = path.join(ROOT, "public", "icons");
 const SETS = [
   { name: "waiter-icon", src: "waiter-icon.svg", sizes: [180, 192, 512] },
   { name: "kitchen-icon", src: "kitchen-icon.svg", sizes: [180, 192, 512] },
+  { name: "remote-icon", src: "remote-icon.svg", sizes: [180, 192, 512] },
   { name: "icon", src: "icon.svg", sizes: [180, 192, 512] },
 ];
 
