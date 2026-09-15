@@ -1,0 +1,33 @@
+{
+  "name": "あづま家 店舗ダッシュボード",
+  "short_name": "店舗ダッシュ",
+  "description": "本日売上・天気・稼働状況の遠隔モニター",
+  "id": "https://azumaya-pos.vercel.app/monitor",
+  "start_url": "/monitor",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#e8912d",
+  "theme_color": "#e8912d",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "/icons/remote-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/remote-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/remote-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

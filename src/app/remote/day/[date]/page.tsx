@@ -83,7 +83,7 @@ export default function RemoteDayPage() {
       {!loading && !error && (
         <div className="mb-4 rounded-2xl bg-white p-5 shadow-sm">
           <p className="text-[13px] text-stone-500">日次売上</p>
-          <p className="mt-1 text-[28px] font-bold tabular-nums" style={{ color: POS_ACCENT }}>
+          <p className="mt-1 text-[28px] font-bold tabular-nums" style={{ color: REMOTE_TEAL }}>
             {yen(summary.total)}
           </p>
           <p className="mt-1 text-[14px] text-stone-600">{summary.count} 件</p>

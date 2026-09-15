@@ -97,11 +97,11 @@ export default function RemoteHomePage() {
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[15px] font-bold text-stone-800">月次売上</h2>
         <div className="flex items-center gap-3">
-          <Link href="/remote/install" className="text-[13px] font-medium" style={{ color: REMOTE_TEAL }}>
-            ホーム画面追加
+          <Link href="/monitor" className="text-[13px] font-medium" style={{ color: REMOTE_TEAL }}>
+            店舗ダッシュ
           </Link>
-          <Link href="/monitor" className="text-[13px] text-stone-500 underline">
-            モニター
+          <Link href="/remote/install" className="text-[13px] text-stone-500 underline">
+            追加手順
           </Link>
         </div>
       </div>

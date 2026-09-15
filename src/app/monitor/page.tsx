@@ -126,14 +126,24 @@ function Metric({ label, value, sub }: { label: string; value: string; sub?: str
   );
 }
 
+function weatherEmoji(label: string): string {
+  if (label.includes("雷")) return "⛈";
+  if (label.includes("雪")) return "❄";
+  if (label.includes("雨")) return "🌧";
+  if (label.includes("霧")) return "🌫";
+  if (label.includes("曇")) return "☁";
+  if (label.includes("晴")) return "☀";
+  return "🌤";
+}
+
 function WeatherRow({ title, w, dow }: { title: string; w: WeatherSnap | null; dow: string }) {
   if (!w) {
     return (
-      <div>
-        <p className="text-[12px] text-stone-500">
+      <div className="rounded-xl bg-sky-50 px-4 py-3">
+        <p className="text-[14px] font-semibold text-stone-800">
           {title}（{dow}）
         </p>
-        <p className="mt-1 text-[15px] text-stone-400">取得中…</p>
+        <p className="mt-2 text-[16px] text-stone-500">取得中…</p>
       </div>
     );
   }
@@ -143,15 +153,24 @@ function WeatherRow({ title, w, dow }: { title: string; w: WeatherSnap | null; d
       : w.tempMax != null
         ? `最高 ${Math.round(w.tempMax)}℃`
         : "—";
+  const wet = w.precipitation >= 1;
   return (
-    <div>
-      <p className="text-[12px] text-stone-500">
-        {title}（{dow}）· {w.date}
+    <div className={`rounded-xl px-4 py-3 ${wet ? "bg-sky-100" : "bg-amber-50"}`}>
+      <p className="text-[13px] font-semibold text-stone-700">
+        {title}（{dow}） · {w.date}
       </p>
-      <p className="mt-1 text-[20px] font-bold text-stone-900">
-        {w.label} <span className="text-[16px] font-semibold text-stone-600">{temp}</span>
-      </p>
-      <p className="mt-0.5 text-[12px] text-stone-400">降水 {w.precipitation.toFixed(1)}mm</p>
+      <div className="mt-2 flex items-center gap-3">
+        <span className="text-[36px] leading-none" aria-hidden>
+          {weatherEmoji(w.label)}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[24px] font-black leading-none text-stone-900">{w.label}</p>
+          <p className="mt-1.5 text-[18px] font-bold tabular-nums text-stone-800">{temp}</p>
+          <p className={`mt-1 text-[14px] font-semibold ${wet ? "text-sky-800" : "text-stone-600"}`}>
+            降水 {w.precipitation.toFixed(1)} mm
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -214,6 +233,9 @@ export default function MonitorPage() {
             >
               更新
             </button>
+            <Link href="/monitor/install" className="rounded-xl bg-white/15 px-3 py-2 text-[14px]">
+              追加
+            </Link>
             <Link href="/admin/dashboard" className="rounded-xl bg-white/15 px-3 py-2 text-[14px]">
               管理
             </Link>
@@ -255,10 +277,17 @@ export default function MonitorPage() {
                       : undefined
                   }
                 />
+                <Link
+                  href="/remote"
+                  className="mt-4 inline-flex text-[14px] font-semibold"
+                  style={{ color: POS_ACCENT }}
+                >
+                  取引履歴・月次売上 →
+                </Link>
               </Card>
 
               <Card title={`天気 · ${data.weather.locationName}`}>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <WeatherRow title="今日" w={data.weather.today} dow={data.outlook.todayDow} />
                   <WeatherRow title="明日" w={data.weather.tomorrow} dow={data.outlook.tomorrowDow} />
                 </div>
@@ -376,13 +405,13 @@ export default function MonitorPage() {
             </div>
 
             <div className="rounded-2xl border border-stone-200 bg-white px-4 py-4">
-              <p className="text-[13px] font-medium text-stone-500">売上・取引履歴（遠隔）</p>
+              <p className="text-[13px] font-medium text-stone-500">くわしい売上・取引履歴</p>
               <Link
                 href="/remote"
                 className="mt-2 inline-flex text-[16px] font-semibold"
                 style={{ color: POS_ACCENT }}
               >
-                ダッシュボードを開く →
+                月次・取引明細を開く →
               </Link>
             </div>
 

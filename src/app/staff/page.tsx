@@ -17,13 +17,14 @@ function nextPath(sp: { next?: string | string[] }): string {
 /** PIN画面でも /remote 向けなら遠隔売上の名前・アイコンにする */
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const next = nextPath(await searchParams);
-  if (next.startsWith("/remote")) {
+  if (next.startsWith("/remote") || next.startsWith("/monitor")) {
+    const isMonitor = next.startsWith("/monitor");
     return {
-      title: "遠隔売上",
-      manifest: "/manifest-remote.json",
+      title: isMonitor ? "店舗ダッシュボード" : "遠隔売上",
+      manifest: isMonitor ? "/manifest-monitor.json" : "/manifest-remote.json",
       appleWebApp: {
         capable: true,
-        title: "遠隔売上",
+        title: isMonitor ? "店舗ダッシュ" : "遠隔売上",
         statusBarStyle: "black-translucent",
       },
       icons: {
